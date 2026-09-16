@@ -1,21 +1,26 @@
 import "dotenv/config";
+
 import { buildApp } from "./app.js";
-
-const app = buildApp();
-
-const port = Number(process.env.PORT) || 5000;
-const host = process.env.HOST || "0.0.0.0";
 
 const start = async () => {
   try {
+    const app = await buildApp();
+
+    await app.ready();
+
+    console.log("\nRegistered Routes:");
+    console.log(app.printRoutes());
+
     await app.listen({
-      port,
-      host,
+      port: Number(process.env.PORT) || 5000,
+      host: process.env.HOST || "0.0.0.0",
     });
 
-    console.log(`Server running on http://localhost:${port}`);
+    console.log(
+      `Server running on http://localhost:${Number(process.env.PORT) || 5000}`,
+    );
   } catch (error) {
-    app.log.error(error);
+    console.error(error);
     process.exit(1);
   }
 };

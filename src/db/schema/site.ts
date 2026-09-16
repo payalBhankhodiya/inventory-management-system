@@ -12,6 +12,15 @@ import {
 
 import { organizations } from "./organization.js";
 
+export type SiteAddress = {
+  addressLine1: string;
+  addressLine2?: string | undefined;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+};
+
 export const siteStatusEnum = pgEnum("site_status", ["ACTIVE", "INACTIVE"]);
 
 export const sites = pgTable(
@@ -26,7 +35,7 @@ export const sites = pgTable(
     name: varchar("name", { length: 150 }).notNull(),
     code: varchar("code", { length: 50 }).notNull(),
     isMain: boolean("is_main").default(false).notNull(),
-    address: jsonb("address"),
+    address: jsonb("address").$type<SiteAddress>(),
     managerId: uuid("manager_id"),
     status: siteStatusEnum("status").default("ACTIVE").notNull(),
 

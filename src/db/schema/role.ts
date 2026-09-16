@@ -1,4 +1,5 @@
 import {
+  pgEnum,
   boolean,
   pgTable,
   timestamp,
@@ -8,6 +9,11 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { organizations } from "./organization.js";
+
+export const roleStatusEnum = pgEnum(
+  "role_status",
+  ["ACTIVE", "INACTIVE"],
+);
 
 export const roles = pgTable(
   "roles",
@@ -21,7 +27,9 @@ export const roles = pgTable(
     name: varchar("name", { length: 100 }).notNull(),
     description: varchar("description", { length: 500 }),
     isSystemRole: boolean("is_system_role").default(false).notNull(),
-    status: varchar("status", { length: 30 }).default("ACTIVE").notNull(),
+    status: roleStatusEnum("status")
+      .notNull()
+      .default("ACTIVE"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

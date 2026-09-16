@@ -42,3 +42,9 @@ New-Item -ItemType Directory -Force -Path `.\src\config,`
 New-Item -ItemType File -Path .\src\app.ts -Force
 
 New-Item -ItemType File -Path .\src\plugins\cors.ts,.\src\plugins\jwt.ts,.\src\plugins\swagger.ts -Force
+
+New-Item -ItemType File -Path .\src\modules\auth\auth.route.ts,.\src\modules\auth\auth.service.ts,.\src\modules\auth\auth.schema.ts -Force
+
+pnpm add fastify-type-provider-zod
+
+New-Item -ItemType File -Path .\src\types\fastify.d.ts -Force
