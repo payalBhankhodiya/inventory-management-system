@@ -1,0 +1,2 @@
+ALTER TABLE "storage_units" ADD CONSTRAINT "storage_units_parent_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."storage_units"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "item_categories" ADD CONSTRAINT "item_categories_parent_id_fk" FOREIGN KEY ("parent_id") REFERENCES "public"."item_categories"("id") ON DELETE no action ON UPDATE no action;
