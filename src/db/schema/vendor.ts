@@ -11,6 +11,15 @@ import {
 
 import { organizations } from "./organization.js";
 
+export type VendorAddress = {
+  addressLine1: string;
+  addressLine2?: string | undefined;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+};
+
 export const vendorStatusEnum = pgEnum("vendor_status", ["ACTIVE", "INACTIVE"]);
 
 export const vendors = pgTable(
@@ -27,7 +36,7 @@ export const vendors = pgTable(
     contactPerson: varchar("contact_person", { length: 150 }),
     email: varchar("email", { length: 255 }),
     phone: varchar("phone", { length: 30 }),
-    address: jsonb("address"),
+    address: jsonb("address").$type<VendorAddress>(),
     taxNumber: varchar("tax_number", { length: 100 }),
 
     status: vendorStatusEnum("status").default("ACTIVE").notNull(),
