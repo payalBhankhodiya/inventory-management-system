@@ -30,6 +30,8 @@ import { maintenanceRoutes } from "./modules/maintenance/maintenance.route.js";
 import { disposalRoutes } from "./modules/disposals/disposal.route.js";
 import { auditLogRoutes } from "./modules/audit-logs/audit-log.route.js";
 import { notificationRoutes } from "./modules/notifications/notification.route.js";
+import { organizationRoutes } from "./modules/organizations/organization.route.js";
+import { permissionRoutes } from "./modules/permissions/permission.route.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -50,12 +52,20 @@ export async function buildApp() {
     prefix: "/api/auth",
   });
 
+  await app.register(organizationRoutes, {
+    prefix: "/api/organizations",
+  });
+
   await app.register(userRoutes, {
     prefix: "/api/users",
   });
 
   await app.register(roleRoutes, {
     prefix: "/api/roles",
+  });
+
+  await app.register(permissionRoutes, {
+    prefix: "/api/permissions",
   });
 
   await app.register(siteRoutes, {
