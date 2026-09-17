@@ -13,7 +13,7 @@ export const registerSchema = z.object({
   password: z.string().min(8),
   employeeCode: z.string().max(50).optional(),
   organizationId: z.uuid(),
-  roleId: z.uuid(),
+  roleName: z.string().min(1).max(100),
   departmentId: z.uuid().optional(),
   siteId: z.uuid().optional(),
 });
@@ -26,6 +26,7 @@ const userResponseSchema = z.object({
   email: z.email(),
   organizationId: z.uuid(),
   roleId: z.uuid(),
+  roleName: z.string(),
   departmentId: z.uuid().nullable(),
   siteId: z.uuid().nullable(),
   status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
@@ -52,5 +53,6 @@ export const meResponseSchema = z.object({
     userId: z.string(),
     organizationId: z.string(),
     roleId: z.string(),
+    roleName: z.string(),
   }),
 });

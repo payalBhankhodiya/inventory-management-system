@@ -43,6 +43,7 @@ export const authRoutes = async (app: FastifyInstance) => {
           email: user.email,
           organizationId: user.organizationId,
           roleId: user.roleId,
+          roleName: user.roleName,
           departmentId: user.departmentId,
           siteId: user.siteId,
           status: user.status,
@@ -70,6 +71,7 @@ export const authRoutes = async (app: FastifyInstance) => {
         userId: user.id,
         organizationId: user.organizationId,
         roleId: user.roleId,
+        roleName: user.roleName,
       });
 
       return reply.send({
@@ -83,6 +85,7 @@ export const authRoutes = async (app: FastifyInstance) => {
             email: user.email,
             organizationId: user.organizationId,
             roleId: user.roleId,
+            roleName: user.roleName,
             departmentId: user.departmentId,
             siteId: user.siteId,
             status: user.status,
