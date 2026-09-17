@@ -12,7 +12,7 @@ export const transferStatusSchema = z.enum([
 
 export const transferItemInputSchema = z.object({
   itemId: z.uuid(),
-  assetId: z.uuid().optional(),
+  assetId: z.uuid().nullable().optional(),
   quantity: z.string().min(1),
   remarks: z.string().max(1000).optional(),
 });
@@ -31,7 +31,7 @@ export const createTransferSchema = z.object({
   toStorageUnitId: z.uuid(),
 
   requestedBy: z.uuid(),
-  approvedBy: z.uuid().optional(),
+  approvedBy: z.uuid().nullable().optional(),
 
   transferDate: z.iso.datetime().optional(),
 

@@ -11,9 +11,9 @@ export const createAuditLogSchema = z.object({
 
   entityId: z.uuid().optional(),
 
-  oldValue: z.record(z.string(), z.unknown()).optional(),
+  oldValue: z.record(z.string(), z.unknown()).nullable().optional(),
 
-  newValue: z.record(z.string(), z.unknown()).optional(),
+  newValue: z.record(z.string(), z.unknown()).nullable().optional(),
 
   ipAddress: z.string().optional(),
 

@@ -12,11 +12,11 @@ export const stockTransactionTypeSchema = z.enum([
 export const stockTransactionItemInputSchema = z.object({
   itemId: z.uuid(),
 
-  fromStorageAreaId: z.uuid().optional(),
-  fromStorageUnitId: z.uuid().optional(),
+  fromStorageAreaId: z.uuid().nullable().optional(),
+  fromStorageUnitId: z.uuid().nullable().optional(),
 
-  toStorageAreaId: z.uuid().optional(),
-  toStorageUnitId: z.uuid().optional(),
+  toStorageAreaId: z.uuid().nullable().optional(),
+  toStorageUnitId: z.uuid().nullable().optional(),
 
   quantity: z.string().min(1),
   unitCost: z.string().optional(),
@@ -34,17 +34,15 @@ export const createStockTransactionSchema = z.object({
   transactionNo: z.string().min(1).max(100),
   type: stockTransactionTypeSchema,
 
-  referenceType: z.string().max(100).optional(),
-  referenceId: z.uuid().optional(),
+  referenceType: z.string().nullable().optional(),
+  referenceId: z.uuid().nullable().optional(),
 
   reason: z.string().max(500).optional(),
   remarks: z.string().max(1000).optional(),
 
   performedBy: z.uuid(),
 
-  items: z
-    .array(stockTransactionItemInputSchema)
-    .min(1),
+  items: z.array(stockTransactionItemInputSchema).min(1),
 });
 
 export type CreateStockTransactionInput = z.infer<

@@ -9,10 +9,7 @@ import {
   registerResponseSchema,
 } from "./auth.schema.js";
 
-import {
-  loginUser,
-  registerUser,
-} from "./auth.service.js";
+import { loginUser, registerUser } from "./auth.service.js";
 
 import { authenticate } from "../../middleware/auth.js";
 
@@ -100,6 +97,7 @@ export const authRoutes = async (app: FastifyInstance) => {
     {
       schema: {
         tags: ["Auth"],
+        security: [{ bearerAuth: [] }],
         response: {
           200: meResponseSchema,
         },

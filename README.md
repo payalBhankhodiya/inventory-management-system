@@ -48,3 +48,4 @@ New-Item -ItemType File -Path .\src\modules\auth\auth.route.ts,.\src\modules\aut
 pnpm add fastify-type-provider-zod
 
 New-Item -ItemType File -Path .\src\types\fastify.d.ts -Force
+pnpm add fastify-plugin
