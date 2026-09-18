@@ -5,7 +5,6 @@ import { auditLogs } from "../../db/schema/audit-log.js";
 
 import type {
   AuditLogListQuery,
-  CreateAuditLogInput,
 } from "./audit-log.schema.js";
 
 export async function getAuditLogs(
@@ -88,23 +87,33 @@ export async function getAuditLogById(
   return auditLog;
 }
 
-export async function createAuditLog(input: CreateAuditLogInput) {
+type CreateAuditLogData = {
+  organizationId: string;
+  userId?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  oldValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};
+
+export async function createAuditLog(
+  input: CreateAuditLogData,
+) {
   const [auditLog] = await db
     .insert(auditLogs)
     .values({
       organizationId: input.organizationId,
-
-      userId: input.userId,
-
+      userId: input.userId ?? null,
       action: input.action,
       entityType: input.entityType,
-      entityId: input.entityId,
-
-      oldValue: input.oldValue,
-      newValue: input.newValue,
-
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
+      entityId: input.entityId ?? null,
+      oldValue: input.oldValue ?? null,
+      newValue: input.newValue ?? null,
+      ipAddress: input.ipAddress ?? null,
+      userAgent: input.userAgent ?? null,
     })
     .returning();
 

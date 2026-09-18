@@ -22,11 +22,8 @@ import {
   updateOrganization,
 } from "./organization.service.js";
 
-export const organizationRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const organizationRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -34,27 +31,20 @@ export const organizationRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Organizations"],
-        querystring:
-          organizationListQuerySchema,
+        querystring: organizationListQuerySchema,
         response: {
-          200:
-            organizationListResponseSchema,
-          400:
-            organizationErrorResponseSchema,
+          200: organizationListResponseSchema,
+          400: organizationErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const result =
-          await getOrganizations(
-            request.query,
-          );
+        const result = await getOrganizations(request.query);
 
         return reply.send({
           success: true,
-          message:
-            "Organizations fetched successfully",
+          message: "Organizations fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -75,36 +65,27 @@ export const organizationRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Organizations"],
-        params:
-          organizationIdParamSchema,
+        params: organizationIdParamSchema,
         response: {
-          200:
-            organizationSingleResponseSchema,
-          404:
-            organizationErrorResponseSchema,
+          200: organizationSingleResponseSchema,
+          404: organizationErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const organization =
-          await getOrganizationById(
-            request.params.id,
-          );
+        const organization = await getOrganizationById(request.params.id);
 
         return reply.send({
           success: true,
-          message:
-            "Organization fetched successfully",
+          message: "Organization fetched successfully",
           data: organization,
         });
       } catch (error) {
         return reply.status(404).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Organization not found",
+            error instanceof Error ? error.message : "Organization not found",
         });
       }
     },
@@ -118,24 +99,22 @@ export const organizationRoutes = async (
         tags: ["Organizations"],
         body: createOrganizationSchema,
         response: {
-          201:
-            organizationSingleResponseSchema,
-          400:
-            organizationErrorResponseSchema,
+          201: organizationSingleResponseSchema,
+          400: organizationErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const organization =
-          await createOrganization(
-            request.body,
-          );
+        const organization = await createOrganization(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Organization created successfully",
+          message: "Organization created successfully",
           data: organization,
         });
       } catch (error) {
@@ -156,31 +135,30 @@ export const organizationRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Organizations"],
-        params:
-          organizationIdParamSchema,
+        params: organizationIdParamSchema,
         body: updateOrganizationSchema,
         response: {
-          200:
-            organizationSingleResponseSchema,
-          400:
-            organizationErrorResponseSchema,
-          404:
-            organizationErrorResponseSchema,
+          200: organizationSingleResponseSchema,
+          400: organizationErrorResponseSchema,
+          404: organizationErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const organization =
-          await updateOrganization(
-            request.params.id,
-            request.body,
-          );
+        const organization = await updateOrganization(
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Organization updated successfully",
+          message: "Organization updated successfully",
           data: organization,
         });
       } catch (error) {
@@ -201,28 +179,25 @@ export const organizationRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Organizations"],
-        params:
-          organizationIdParamSchema,
+        params: organizationIdParamSchema,
         response: {
-          200:
-            organizationDeleteResponseSchema,
-          400:
-            organizationErrorResponseSchema,
-          404:
-            organizationErrorResponseSchema,
+          200: organizationDeleteResponseSchema,
+          400: organizationErrorResponseSchema,
+          404: organizationErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        await deleteOrganization(
-          request.params.id,
-        );
+        await deleteOrganization(request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.send({
           success: true,
-          message:
-            "Organization deactivated successfully",
+          message: "Organization deactivated successfully",
         });
       } catch (error) {
         return reply.status(400).send({

@@ -1,7 +1,15 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../../db/index.js";
 import { organizations } from "../../db/schema/organization.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 import type {
   CreateOrganizationInput,
@@ -9,29 +17,53 @@ import type {
   UpdateOrganizationInput,
 } from "./organization.schema.js";
 
-export async function getOrganizations(query: OrganizationListQuery) {
+type AuditInfo = {
+  userId: string;
+  ipAddress?: string;
+  userAgent?: string | null;
+};
+
+export async function getOrganizations(
+  query: OrganizationListQuery,
+) {
   const conditions = [];
 
   if (query.search) {
     conditions.push(
       or(
-        ilike(organizations.name, `%${query.search}%`),
-        ilike(organizations.code, `%${query.search}%`),
-        ilike(organizations.email, `%${query.search}%`),
+        ilike(
+          organizations.name,
+          `%${query.search}%`,
+        ),
+        ilike(
+          organizations.code,
+          `%${query.search}%`,
+        ),
+        ilike(
+          organizations.email,
+          `%${query.search}%`,
+        ),
       )!,
     );
   }
 
   if (query.status) {
-    conditions.push(eq(organizations.status, query.status));
+    conditions.push(
+      eq(organizations.status, query.status),
+    );
   }
 
-  const offset = (query.page - 1) * query.limit;
+  const offset =
+    (query.page - 1) * query.limit;
 
   const data = await db
     .select()
     .from(organizations)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(
+      conditions.length > 0
+        ? and(...conditions)
+        : undefined,
+    )
     .orderBy(desc(organizations.createdAt))
     .limit(query.limit)
     .offset(offset);
@@ -41,9 +73,15 @@ export async function getOrganizations(query: OrganizationListQuery) {
       count: sql<number>`count(*)`,
     })
     .from(organizations)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
+    .where(
+      conditions.length > 0
+        ? and(...conditions)
+        : undefined,
+    );
 
-  const total = Number(countResult[0]?.count ?? 0);
+  const total = Number(
+    countResult[0]?.count ?? 0,
+  );
 
   return {
     data,
@@ -51,30 +89,49 @@ export async function getOrganizations(query: OrganizationListQuery) {
       page: query.page,
       limit: query.limit,
       total,
-      totalPages: Math.ceil(total / query.limit),
+      totalPages: Math.ceil(
+        total / query.limit,
+      ),
     },
   };
 }
 
-export async function getOrganizationById(organizationId: string) {
-  const organization = await db.query.organizations.findFirst({
-    where: eq(organizations.id, organizationId),
-  });
+export async function getOrganizationById(
+  organizationId: string,
+) {
+  const organization =
+    await db.query.organizations.findFirst({
+      where: eq(
+        organizations.id,
+        organizationId,
+      ),
+    });
 
   if (!organization) {
-    throw new Error("Organization not found");
+    throw new Error(
+      "Organization not found",
+    );
   }
 
   return organization;
 }
 
-export async function createOrganization(input: CreateOrganizationInput) {
-  const existing = await db.query.organizations.findFirst({
-    where: eq(organizations.code, input.code),
-  });
+export async function createOrganization(
+  input: CreateOrganizationInput,
+  auditInfo: AuditInfo,
+) {
+  const existing =
+    await db.query.organizations.findFirst({
+      where: eq(
+        organizations.code,
+        input.code,
+      ),
+    });
 
   if (existing) {
-    throw new Error("Organization code already exists");
+    throw new Error(
+      "Organization code already exists",
+    );
   }
 
   const [organization] = await db
@@ -90,8 +147,22 @@ export async function createOrganization(input: CreateOrganizationInput) {
     .returning();
 
   if (!organization) {
-    throw new Error("Failed to create organization");
+    throw new Error(
+      "Failed to create organization",
+    );
   }
+
+  await createAuditLog({
+    organizationId: organization.id,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "ORGANIZATION",
+    entityId: organization.id,
+    oldValue: null,
+    newValue: organization,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return organization;
 }
@@ -99,19 +170,29 @@ export async function createOrganization(input: CreateOrganizationInput) {
 export async function updateOrganization(
   organizationId: string,
   input: UpdateOrganizationInput,
+  auditInfo: AuditInfo,
 ) {
-  await getOrganizationById(organizationId);
+  const existing =
+    await getOrganizationById(
+      organizationId,
+    );
 
   if (input.code) {
-    const existing = await db.query.organizations.findFirst({
-      where: and(
-        eq(organizations.code, input.code),
-        sql`${organizations.id} <> ${organizationId}`,
-      ),
-    });
+    const duplicate =
+      await db.query.organizations.findFirst({
+        where: and(
+          eq(
+            organizations.code,
+            input.code,
+          ),
+          sql`${organizations.id} <> ${organizationId}`,
+        ),
+      });
 
-    if (existing) {
-      throw new Error("Organization code already exists");
+    if (duplicate) {
+      throw new Error(
+        "Organization code already exists",
+      );
     }
   }
 
@@ -126,18 +207,43 @@ export async function updateOrganization(
       status: input.status,
       updatedAt: new Date(),
     })
-    .where(eq(organizations.id, organizationId))
+    .where(
+      eq(
+        organizations.id,
+        organizationId,
+      ),
+    )
     .returning();
 
   if (!organization) {
-    throw new Error("Failed to update organization");
+    throw new Error(
+      "Failed to update organization",
+    );
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "ORGANIZATION",
+    entityId: organizationId,
+    oldValue: existing,
+    newValue: organization,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return organization;
 }
 
-export async function deleteOrganization(organizationId: string) {
-  await getOrganizationById(organizationId);
+export async function deleteOrganization(
+  organizationId: string,
+  auditInfo: AuditInfo,
+) {
+  const existing =
+    await getOrganizationById(
+      organizationId,
+    );
 
   const [organization] = await db
     .update(organizations)
@@ -145,12 +251,31 @@ export async function deleteOrganization(organizationId: string) {
       status: "INACTIVE",
       updatedAt: new Date(),
     })
-    .where(eq(organizations.id, organizationId))
+    .where(
+      eq(
+        organizations.id,
+        organizationId,
+      ),
+    )
     .returning();
 
   if (!organization) {
-    throw new Error("Failed to deactivate organization");
+    throw new Error(
+      "Failed to deactivate organization",
+    );
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "ORGANIZATION",
+    entityId: organizationId,
+    oldValue: existing,
+    newValue: organization,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return organization;
 }
