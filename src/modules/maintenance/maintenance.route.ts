@@ -22,11 +22,8 @@ import {
   updateMaintenance,
 } from "./maintenance.service.js";
 
-export const maintenanceRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const maintenanceRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -43,16 +40,14 @@ export const maintenanceRoutes = async (
     },
     async (request, reply) => {
       try {
-        const result =
-          await getMaintenances(
-            request.user.organizationId,
-            request.query,
-          );
+        const result = await getMaintenances(
+          request.user.organizationId,
+          request.query,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Maintenance records fetched successfully",
+          message: "Maintenance records fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -82,16 +77,14 @@ export const maintenanceRoutes = async (
     },
     async (request, reply) => {
       try {
-        const maintenance =
-          await getMaintenanceById(
-            request.user.organizationId,
-            request.params.id,
-          );
+        const maintenance = await getMaintenanceById(
+          request.user.organizationId,
+          request.params.id,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Maintenance record fetched successfully",
+          message: "Maintenance record fetched successfully",
           data: maintenance,
         });
       } catch (error) {
@@ -121,15 +114,15 @@ export const maintenanceRoutes = async (
     },
     async (request, reply) => {
       try {
-        const maintenance =
-          await createMaintenance(
-            request.body,
-          );
+        const maintenance = await createMaintenance(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Maintenance record created successfully",
+          message: "Maintenance record created successfully",
           data: maintenance,
         });
       } catch (error) {
@@ -161,17 +154,20 @@ export const maintenanceRoutes = async (
     },
     async (request, reply) => {
       try {
-        const maintenance =
-          await updateMaintenance(
-            request.user.organizationId,
-            request.params.id,
-            request.body,
-          );
+        const maintenance = await updateMaintenance(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Maintenance record updated successfully",
+          message: "Maintenance record updated successfully",
           data: maintenance,
         });
       } catch (error) {
@@ -205,12 +201,16 @@ export const maintenanceRoutes = async (
         await deleteMaintenance(
           request.user.organizationId,
           request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
           success: true,
-          message:
-            "Maintenance cancelled successfully",
+          message: "Maintenance cancelled successfully",
         });
       } catch (error) {
         return reply.status(400).send({

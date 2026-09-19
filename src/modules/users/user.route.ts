@@ -21,11 +21,8 @@ import {
   updateUser,
 } from "./user.service.js";
 
-export const userRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const userRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -43,10 +40,7 @@ export const userRoutes = async (
       },
     },
     async (request, reply) => {
-      const result = await getUsers(
-        request.user.organizationId,
-        request.query,
-      );
+      const result = await getUsers(request.user.organizationId, request.query);
 
       return reply.send({
         success: true,
@@ -101,9 +95,11 @@ export const userRoutes = async (
       },
     },
     async (request, reply) => {
-      const user = await createUser(
-        request.body,
-      );
+      const user = await createUser(request.body, {
+        userId: request.user.userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
 
       return reply.status(201).send({
         success: true,
@@ -135,8 +131,12 @@ export const userRoutes = async (
         request.user.organizationId,
         request.params.id,
         request.body,
+        {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        },
       );
-
       return reply.send({
         success: true,
         message: "User updated successfully",
@@ -161,10 +161,11 @@ export const userRoutes = async (
       },
     },
     async (request, reply) => {
-      await deleteUser(
-        request.user.organizationId,
-        request.params.id,
-      );
+      await deleteUser(request.user.organizationId, request.params.id, {
+        userId: request.user.userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
 
       return reply.send({
         success: true,

@@ -8,6 +8,8 @@ import type {
   PermissionListQuery,
   UpdatePermissionInput,
 } from "./permission.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getPermissions(query: PermissionListQuery) {
   const conditions = [];
@@ -73,7 +75,11 @@ export async function getPermissionById(permissionId: string) {
   return permission;
 }
 
-export async function createPermission(input: CreatePermissionInput) {
+export async function createPermission(
+  organizationId: string,
+  input: CreatePermissionInput,
+  auditInfo: AuditInfo,
+) {
   const existing = await db.query.permissions.findFirst({
     where: and(
       eq(permissions.module, input.module),
@@ -99,15 +105,33 @@ export async function createPermission(input: CreatePermissionInput) {
     throw new Error("Failed to create permission");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "PERMISSION",
+    entityId: permission.id,
+    oldValue: null,
+    newValue: permission,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
   return permission;
 }
 
 export async function updatePermission(
+  organizationId: string,
   permissionId: string,
   input: UpdatePermissionInput,
+  auditInfo: AuditInfo,
 ) {
-  await getPermissionById(permissionId);
+  const existingPermission = await db.query.permissions.findFirst({
+    where: eq(permissions.id, permissionId),
+  });
 
+  if (!existingPermission) {
+    throw new Error("Permission not found");
+  }
   if (input.module !== undefined || input.action !== undefined) {
     const current = await getPermissionById(permissionId);
 
@@ -143,13 +167,46 @@ export async function updatePermission(
     throw new Error("Failed to update permission");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "PERMISSION",
+    entityId: permission.id,
+    oldValue: existingPermission,
+    newValue: permission,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return permission;
 }
 
-export async function deletePermission(permissionId: string) {
-  await getPermissionById(permissionId);
+export async function deletePermission(
+  organizationId: string,
+  permissionId: string,
+  auditInfo: AuditInfo,
+) {
+  const existingPermission = await db.query.permissions.findFirst({
+    where: eq(permissions.id, permissionId),
+  });
 
+  if (!existingPermission) {
+    throw new Error("Permission not found");
+  }
   await db.delete(permissions).where(eq(permissions.id, permissionId));
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "PERMISSION",
+    entityId: permissionId,
+    oldValue: existingPermission,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return true;
 }

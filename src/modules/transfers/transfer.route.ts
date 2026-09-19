@@ -22,11 +22,8 @@ import {
   updateTransfer,
 } from "./transfer.service.js";
 
-export const transferRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const transferRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -34,28 +31,23 @@ export const transferRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Transfers"],
-        querystring:
-          transfersListQuerySchema,
+        querystring: transfersListQuerySchema,
         response: {
-          200:
-            transfersListResponseSchema,
-          400:
-            transferErrorResponseSchema,
+          200: transfersListResponseSchema,
+          400: transferErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const result =
-          await getTransfers(
-            request.user.organizationId,
-            request.query,
-          );
+        const result = await getTransfers(
+          request.user.organizationId,
+          request.query,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Transfers fetched successfully",
+          message: "Transfers fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -76,39 +68,31 @@ export const transferRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Transfers"],
-        params:
-          transferIdParamSchema,
+        params: transferIdParamSchema,
         response: {
-          200:
-            transferSingleResponseSchema,
-          400:
-            transferErrorResponseSchema,
-          404:
-            transferErrorResponseSchema,
+          200: transferSingleResponseSchema,
+          400: transferErrorResponseSchema,
+          404: transferErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const transfer =
-          await getTransferById(
-            request.user.organizationId,
-            request.params.id,
-          );
+        const transfer = await getTransferById(
+          request.user.organizationId,
+          request.params.id,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Transfer fetched successfully",
+          message: "Transfer fetched successfully",
           data: transfer,
         });
       } catch (error) {
         return reply.status(404).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Transfer not found",
+            error instanceof Error ? error.message : "Transfer not found",
         });
       }
     },
@@ -122,24 +106,22 @@ export const transferRoutes = async (
         tags: ["Transfers"],
         body: createTransferSchema,
         response: {
-          201:
-            transferSingleResponseSchema,
-          400:
-            transferErrorResponseSchema,
+          201: transferSingleResponseSchema,
+          400: transferErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const transfer =
-          await createTransfer(
-            request.body,
-          );
+        const transfer = await createTransfer(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Transfer created successfully",
+          message: "Transfer created successfully",
           data: transfer,
         });
       } catch (error) {
@@ -160,32 +142,31 @@ export const transferRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Transfers"],
-        params:
-          transferIdParamSchema,
+        params: transferIdParamSchema,
         body: updateTransferSchema,
         response: {
-          200:
-            transferSingleResponseSchema,
-          400:
-            transferErrorResponseSchema,
-          404:
-            transferErrorResponseSchema,
+          200: transferSingleResponseSchema,
+          400: transferErrorResponseSchema,
+          404: transferErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const transfer =
-          await updateTransfer(
-            request.user.organizationId,
-            request.params.id,
-            request.body,
-          );
+        const transfer = await updateTransfer(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Transfer updated successfully",
+          message: "Transfer updated successfully",
           data: transfer,
         });
       } catch (error) {
@@ -206,29 +187,24 @@ export const transferRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Transfers"],
-        params:
-          transferIdParamSchema,
+        params: transferIdParamSchema,
         response: {
-          200:
-            deleteTransferResponseSchema,
-          400:
-            transferErrorResponseSchema,
-          404:
-            transferErrorResponseSchema,
+          200: deleteTransferResponseSchema,
+          400: transferErrorResponseSchema,
+          404: transferErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        await deleteTransfer(
-          request.user.organizationId,
-          request.params.id,
-        );
-
+        await deleteTransfer(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.send({
           success: true,
-          message:
-            "Transfer cancelled successfully",
+          message: "Transfer cancelled successfully",
         });
       } catch (error) {
         return reply.status(400).send({

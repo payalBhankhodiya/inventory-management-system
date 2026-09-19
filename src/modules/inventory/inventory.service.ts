@@ -8,6 +8,8 @@ import type {
   InventoriesListQuery,
   UpdateInventoryInput,
 } from "./inventory.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getInventories(
   organizationId: string,
@@ -75,7 +77,10 @@ export async function getInventoryById(
   return inventory;
 }
 
-export async function createInventory(input: CreateInventoryInput) {
+export async function createInventory(
+  input: CreateInventoryInput,
+  auditInfo: AuditInfo,
+) {
   const existingInventory = await db.query.inventories.findFirst({
     where: and(
       eq(inventories.organizationId, input.organizationId),
@@ -112,6 +117,18 @@ export async function createInventory(input: CreateInventoryInput) {
     throw new Error("Failed to create inventory");
   }
 
+  await createAuditLog({
+    organizationId: inventory.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "INVENTORY",
+    entityId: inventory.id,
+    oldValue: null,
+    newValue: inventory,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return inventory;
 }
 
@@ -119,8 +136,18 @@ export async function updateInventory(
   organizationId: string,
   inventoryId: string,
   input: UpdateInventoryInput,
+  auditInfo: AuditInfo,
 ) {
-  await getInventoryById(organizationId, inventoryId);
+  const existingInventory = await db.query.inventories.findFirst({
+    where: and(
+      eq(inventories.id, inventoryId),
+      eq(inventories.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingInventory) {
+    throw new Error("Inventory not found");
+  }
 
   const [inventory] = await db
     .update(inventories)
@@ -146,14 +173,36 @@ export async function updateInventory(
     throw new Error("Failed to update inventory");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "INVENTORY",
+    entityId: inventory.id,
+    oldValue: existingInventory,
+    newValue: inventory,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return inventory;
 }
 
 export async function deleteInventory(
   organizationId: string,
   inventoryId: string,
+  auditInfo: AuditInfo,
 ) {
-  await getInventoryById(organizationId, inventoryId);
+  const existingInventory = await db.query.inventories.findFirst({
+    where: and(
+      eq(inventories.id, inventoryId),
+      eq(inventories.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingInventory) {
+    throw new Error("Inventory not found");
+  }
 
   const [inventory] = await db
     .delete(inventories)
@@ -168,6 +217,18 @@ export async function deleteInventory(
   if (!inventory) {
     throw new Error("Failed to delete inventory");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "INVENTORY",
+    entityId: inventoryId,
+    oldValue: existingInventory,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return inventory;
 }

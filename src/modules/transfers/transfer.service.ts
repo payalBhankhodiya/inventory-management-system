@@ -9,86 +9,51 @@ import type {
   TransfersListQuery,
   UpdateTransferInput,
 } from "./transfer.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getTransfers(
   organizationId: string,
   query: TransfersListQuery,
 ) {
-  const conditions = [
-    eq(transfers.organizationId, organizationId),
-  ];
+  const conditions = [eq(transfers.organizationId, organizationId)];
 
   if (query.search) {
     conditions.push(
       or(
-        ilike(
-          transfers.referenceNo,
-          `%${query.search}%`,
-        ),
-        ilike(
-          transfers.reason,
-          `%${query.search}%`,
-        ),
-        ilike(
-          transfers.remarks,
-          `%${query.search}%`,
-        ),
+        ilike(transfers.referenceNo, `%${query.search}%`),
+        ilike(transfers.reason, `%${query.search}%`),
+        ilike(transfers.remarks, `%${query.search}%`),
       )!,
     );
   }
 
   if (query.status) {
-    conditions.push(
-      eq(transfers.status, query.status),
-    );
+    conditions.push(eq(transfers.status, query.status));
   }
 
   if (query.requestedBy) {
-    conditions.push(
-      eq(transfers.requestedBy, query.requestedBy),
-    );
+    conditions.push(eq(transfers.requestedBy, query.requestedBy));
   }
 
   if (query.approvedBy) {
-    conditions.push(
-      eq(transfers.approvedBy, query.approvedBy),
-    );
+    conditions.push(eq(transfers.approvedBy, query.approvedBy));
   }
 
   if (query.fromStorageAreaId) {
-    conditions.push(
-      eq(
-        transfers.fromStorageAreaId,
-        query.fromStorageAreaId,
-      ),
-    );
+    conditions.push(eq(transfers.fromStorageAreaId, query.fromStorageAreaId));
   }
 
   if (query.fromStorageUnitId) {
-    conditions.push(
-      eq(
-        transfers.fromStorageUnitId,
-        query.fromStorageUnitId,
-      ),
-    );
+    conditions.push(eq(transfers.fromStorageUnitId, query.fromStorageUnitId));
   }
 
   if (query.toStorageAreaId) {
-    conditions.push(
-      eq(
-        transfers.toStorageAreaId,
-        query.toStorageAreaId,
-      ),
-    );
+    conditions.push(eq(transfers.toStorageAreaId, query.toStorageAreaId));
   }
 
   if (query.toStorageUnitId) {
-    conditions.push(
-      eq(
-        transfers.toStorageUnitId,
-        query.toStorageUnitId,
-      ),
-    );
+    conditions.push(eq(transfers.toStorageUnitId, query.toStorageUnitId));
   }
 
   const offset = (query.page - 1) * query.limit;
@@ -115,12 +80,7 @@ export async function getTransfers(
       const items = await db
         .select()
         .from(transferItems)
-        .where(
-          eq(
-            transferItems.transferId,
-            transfer.id,
-          ),
-        );
+        .where(eq(transferItems.transferId, transfer.id));
 
       return {
         ...transfer,
@@ -135,9 +95,7 @@ export async function getTransfers(
       page: query.page,
       limit: query.limit,
       total,
-      totalPages: Math.ceil(
-        total / query.limit,
-      ),
+      totalPages: Math.ceil(total / query.limit),
     },
   };
 }
@@ -146,16 +104,12 @@ export async function getTransferById(
   organizationId: string,
   transferId: string,
 ) {
-  const transfer =
-    await db.query.transfers.findFirst({
-      where: and(
-        eq(transfers.id, transferId),
-        eq(
-          transfers.organizationId,
-          organizationId,
-        ),
-      ),
-    });
+  const transfer = await db.query.transfers.findFirst({
+    where: and(
+      eq(transfers.id, transferId),
+      eq(transfers.organizationId, organizationId),
+    ),
+  });
 
   if (!transfer) {
     throw new Error("Transfer not found");
@@ -164,12 +118,7 @@ export async function getTransferById(
   const items = await db
     .select()
     .from(transferItems)
-    .where(
-      eq(
-        transferItems.transferId,
-        transfer.id,
-      ),
-    );
+    .where(eq(transferItems.transferId, transfer.id));
 
   return {
     ...transfer,
@@ -179,33 +128,26 @@ export async function getTransferById(
 
 export async function createTransfer(
   input: CreateTransferInput,
+  auditInfo: AuditInfo,
 ) {
   if (
-    input.fromStorageAreaId ===
-      input.toStorageAreaId &&
-    input.fromStorageUnitId ===
-      input.toStorageUnitId
+    input.fromStorageAreaId === input.toStorageAreaId &&
+    input.fromStorageUnitId === input.toStorageUnitId
   ) {
     throw new Error(
       "Source and destination storage location cannot be the same",
     );
   }
 
-  const existingTransfer =
-    await db.query.transfers.findFirst({
-      where: eq(
-        transfers.referenceNo,
-        input.referenceNo,
-      ),
-    });
+  const existingTransfer = await db.query.transfers.findFirst({
+    where: eq(transfers.referenceNo, input.referenceNo),
+  });
 
   if (existingTransfer) {
-    throw new Error(
-      "Transfer with this reference number already exists",
-    );
+    throw new Error("Transfer with this reference number already exists");
   }
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const [transfer] = await tx
       .insert(transfers)
       .values({
@@ -213,15 +155,11 @@ export async function createTransfer(
 
         referenceNo: input.referenceNo,
 
-        fromStorageAreaId:
-          input.fromStorageAreaId,
-        fromStorageUnitId:
-          input.fromStorageUnitId,
+        fromStorageAreaId: input.fromStorageAreaId,
+        fromStorageUnitId: input.fromStorageUnitId,
 
-        toStorageAreaId:
-          input.toStorageAreaId,
-        toStorageUnitId:
-          input.toStorageUnitId,
+        toStorageAreaId: input.toStorageAreaId,
+        toStorageUnitId: input.toStorageUnitId,
 
         requestedBy: input.requestedBy,
         approvedBy: input.approvedBy,
@@ -238,9 +176,7 @@ export async function createTransfer(
       .returning();
 
     if (!transfer) {
-      throw new Error(
-        "Failed to create transfer",
-      );
+      throw new Error("Failed to create transfer");
     }
 
     const items = await tx
@@ -261,39 +197,50 @@ export async function createTransfer(
       items,
     };
   });
+
+  await createAuditLog({
+    organizationId: result.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "TRANSFER",
+    entityId: result.id,
+    oldValue: null,
+    newValue: result,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
+  return result;
 }
 
 export async function updateTransfer(
   organizationId: string,
   transferId: string,
   input: UpdateTransferInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingTransfer =
-    await getTransferById(
-      organizationId,
-      transferId,
-    );
+  const existingTransfer = await db.query.transfers.findFirst({
+    where: and(
+      eq(transfers.id, transferId),
+      eq(transfers.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingTransfer) {
+    throw new Error("Transfer not found");
+  }
 
   const fromArea =
-    input.fromStorageAreaId ??
-    existingTransfer.fromStorageAreaId;
+    input.fromStorageAreaId ?? existingTransfer.fromStorageAreaId;
 
   const fromUnit =
-    input.fromStorageUnitId ??
-    existingTransfer.fromStorageUnitId;
+    input.fromStorageUnitId ?? existingTransfer.fromStorageUnitId;
 
-  const toArea =
-    input.toStorageAreaId ??
-    existingTransfer.toStorageAreaId;
+  const toArea = input.toStorageAreaId ?? existingTransfer.toStorageAreaId;
 
-  const toUnit =
-    input.toStorageUnitId ??
-    existingTransfer.toStorageUnitId;
+  const toUnit = input.toStorageUnitId ?? existingTransfer.toStorageUnitId;
 
-  if (
-    fromArea === toArea &&
-    fromUnit === toUnit
-  ) {
+  if (fromArea === toArea && fromUnit === toUnit) {
     throw new Error(
       "Source and destination storage location cannot be the same",
     );
@@ -303,70 +250,89 @@ export async function updateTransfer(
     .update(transfers)
     .set({
       fromStorageAreaId:
-        input.fromStorageAreaId,
+        input.fromStorageAreaId ?? existingTransfer.fromStorageAreaId,
+
       fromStorageUnitId:
-        input.fromStorageUnitId,
+        input.fromStorageUnitId ?? existingTransfer.fromStorageUnitId,
 
       toStorageAreaId:
-        input.toStorageAreaId,
-      toStorageUnitId:
-        input.toStorageUnitId,
+        input.toStorageAreaId ?? existingTransfer.toStorageAreaId,
 
-      approvedBy: input.approvedBy,
+      toStorageUnitId:
+        input.toStorageUnitId ?? existingTransfer.toStorageUnitId,
+
+      approvedBy: input.approvedBy ?? existingTransfer.approvedBy,
 
       transferDate:
         input.transferDate !== undefined
           ? input.transferDate === null
             ? null
             : new Date(input.transferDate)
-          : undefined,
+          : existingTransfer.transferDate,
 
-      status: input.status,
+      status: input.status ?? existingTransfer.status,
 
-      reason: input.reason,
-      remarks: input.remarks,
+      reason: input.reason ?? existingTransfer.reason,
+
+      remarks: input.remarks ?? existingTransfer.remarks,
 
       updatedAt: new Date(),
     })
     .where(
       and(
         eq(transfers.id, transferId),
-        eq(
-          transfers.organizationId,
-          organizationId,
-        ),
+        eq(transfers.organizationId, organizationId),
       ),
     )
     .returning();
 
   if (!transfer) {
-    throw new Error(
-      "Failed to update transfer",
-    );
+    throw new Error("Failed to update transfer");
   }
 
-  return {
+  const items = await db
+    .select()
+    .from(transferItems)
+    .where(eq(transferItems.transferId, transfer.id));
+
+  const result = {
     ...transfer,
-    items: existingTransfer.items,
+    items,
   };
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "TRANSFER",
+    entityId: transfer.id,
+    oldValue: existingTransfer,
+    newValue: result,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
+  return result;
 }
 
 export async function deleteTransfer(
   organizationId: string,
   transferId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingTransfer =
-    await getTransferById(
-      organizationId,
-      transferId,
-    );
+  const existingTransfer = await db.query.transfers.findFirst({
+    where: and(
+      eq(transfers.id, transferId),
+      eq(transfers.organizationId, organizationId),
+    ),
+  });
 
-  if (
-    existingTransfer.status === "CANCELLED"
-  ) {
-    throw new Error(
-      "Transfer is already cancelled",
-    );
+  if (!existingTransfer) {
+    throw new Error("Transfer not found");
+  }
+
+  if (existingTransfer.status === "CANCELLED") {
+    throw new Error("Transfer is already cancelled");
   }
 
   const [transfer] = await db
@@ -378,22 +344,26 @@ export async function deleteTransfer(
     .where(
       and(
         eq(transfers.id, transferId),
-        eq(
-          transfers.organizationId,
-          organizationId,
-        ),
+        eq(transfers.organizationId, organizationId),
       ),
     )
     .returning();
 
   if (!transfer) {
-    throw new Error(
-      "Failed to cancel transfer",
-    );
+    throw new Error("Failed to cancel transfer");
   }
 
-  return {
-    ...transfer,
-    items: existingTransfer.items,
-  };
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "TRANSFER",
+    entityId: transferId,
+    oldValue: existingTransfer,
+    newValue: transfer,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
+  return transfer;
 }

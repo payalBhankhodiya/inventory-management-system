@@ -98,8 +98,11 @@ export const siteRoutes = async (app: FastifyInstance) => {
       },
     },
     async (request, reply) => {
-      const site = await createSite(request.body);
-
+      const site = await createSite(request.body, {
+        userId: request.user.userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
       return reply.status(201).send({
         success: true,
         message: "Site created successfully",
@@ -131,6 +134,11 @@ export const siteRoutes = async (app: FastifyInstance) => {
         request.user.organizationId,
         request.params.id,
         request.body,
+        {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        },
       );
 
       return reply.send({
@@ -158,8 +166,11 @@ export const siteRoutes = async (app: FastifyInstance) => {
       },
     },
     async (request, reply) => {
-      await deleteSite(request.user.organizationId, request.params.id);
-
+      await deleteSite(request.user.organizationId, request.params.id, {
+        userId: request.user.userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
       return reply.send({
         success: true,
         message: "Site deactivated successfully",

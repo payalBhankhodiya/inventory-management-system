@@ -8,6 +8,8 @@ import type {
   ReturnsListQuery,
   UpdateReturnInput,
 } from "./return.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getReturns(
   organizationId: string,
@@ -110,7 +112,10 @@ export async function getReturnById(organizationId: string, returnId: string) {
   return returnRecord;
 }
 
-export async function createReturn(input: CreateReturnInput) {
+export async function createReturn(
+  input: CreateReturnInput,
+  auditInfo: AuditInfo,
+) {
   const existingReturn = await db.query.returns.findFirst({
     where: and(
       eq(returns.organizationId, input.organizationId),
@@ -154,6 +159,18 @@ export async function createReturn(input: CreateReturnInput) {
     throw new Error("Failed to create return");
   }
 
+  await createAuditLog({
+    organizationId: returnRecord.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "RETURN",
+    entityId: returnRecord.id,
+    oldValue: null,
+    newValue: returnRecord,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return returnRecord;
 }
 
@@ -161,8 +178,18 @@ export async function updateReturn(
   organizationId: string,
   returnId: string,
   input: UpdateReturnInput,
+  auditInfo: AuditInfo,
 ) {
-  await getReturnById(organizationId, returnId);
+  const existingReturn = await db.query.returns.findFirst({
+    where: and(
+      eq(returns.id, returnId),
+      eq(returns.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingReturn) {
+    throw new Error("Return not found");
+  }
 
   const [returnRecord] = await db
     .update(returns)
@@ -196,11 +223,36 @@ export async function updateReturn(
     throw new Error("Failed to update return");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "RETURN",
+    entityId: returnRecord.id,
+    oldValue: existingReturn,
+    newValue: returnRecord,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return returnRecord;
 }
 
-export async function deleteReturn(organizationId: string, returnId: string) {
-  const existingReturn = await getReturnById(organizationId, returnId);
+export async function deleteReturn(
+  organizationId: string,
+  returnId: string,
+  auditInfo: AuditInfo,
+) {
+  const existingReturn = await db.query.returns.findFirst({
+    where: and(
+      eq(returns.id, returnId),
+      eq(returns.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingReturn) {
+    throw new Error("Return not found");
+  }
 
   if (existingReturn.status === "COMPLETED") {
     throw new Error("Completed return cannot be cancelled");
@@ -220,6 +272,18 @@ export async function deleteReturn(organizationId: string, returnId: string) {
   if (!returnRecord) {
     throw new Error("Failed to reject return");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "RETURN",
+    entityId: returnId,
+    oldValue: existingReturn,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return returnRecord;
 }

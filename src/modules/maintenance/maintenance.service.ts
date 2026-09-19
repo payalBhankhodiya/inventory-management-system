@@ -8,6 +8,8 @@ import type {
   MaintenanceListQuery,
   UpdateMaintenanceInput,
 } from "./maintenance.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getMaintenances(
   organizationId: string,
@@ -94,7 +96,10 @@ export async function getMaintenanceById(
   return maintenance;
 }
 
-export async function createMaintenance(input: CreateMaintenanceInput) {
+export async function createMaintenance(
+  input: CreateMaintenanceInput,
+  auditInfo: AuditInfo,
+) {
   const [maintenance] = await db
     .insert(maintenances)
     .values({
@@ -133,6 +138,18 @@ export async function createMaintenance(input: CreateMaintenanceInput) {
     throw new Error("Failed to create maintenance record");
   }
 
+  await createAuditLog({
+    organizationId: maintenance.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "MAINTENANCE",
+    entityId: maintenance.id,
+    oldValue: null,
+    newValue: maintenance,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return maintenance;
 }
 
@@ -140,8 +157,18 @@ export async function updateMaintenance(
   organizationId: string,
   maintenanceId: string,
   input: UpdateMaintenanceInput,
+  auditInfo: AuditInfo,
 ) {
-  await getMaintenanceById(organizationId, maintenanceId);
+  const existingMaintenance = await db.query.maintenances.findFirst({
+    where: and(
+      eq(maintenances.id, maintenanceId),
+      eq(maintenances.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingMaintenance) {
+    throw new Error("Maintenance not found");
+  }
 
   const [maintenance] = await db
     .update(maintenances)
@@ -196,20 +223,42 @@ export async function updateMaintenance(
     throw new Error("Failed to update maintenance record");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "MAINTENANCE",
+    entityId: maintenance.id,
+    oldValue: existingMaintenance,
+    newValue: maintenance,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return maintenance;
 }
 
 export async function deleteMaintenance(
   organizationId: string,
   maintenanceId: string,
+  auditInfo: AuditInfo,
 ) {
-  const maintenance = await getMaintenanceById(organizationId, maintenanceId);
+  const existingMaintenance = await db.query.maintenances.findFirst({
+    where: and(
+      eq(maintenances.id, maintenanceId),
+      eq(maintenances.organizationId, organizationId),
+    ),
+  });
 
-  if (maintenance.status === "IN_PROGRESS") {
+  if (!existingMaintenance) {
+    throw new Error("Maintenance not found");
+  }
+
+  if (existingMaintenance.status === "IN_PROGRESS") {
     throw new Error("Maintenance in progress cannot be cancelled");
   }
 
-  if (maintenance.status === "COMPLETED") {
+  if (existingMaintenance.status === "COMPLETED") {
     throw new Error("Completed maintenance cannot be cancelled");
   }
 
@@ -230,6 +279,18 @@ export async function deleteMaintenance(
   if (!updated) {
     throw new Error("Failed to cancel maintenance");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "MAINTENANCE",
+    entityId: maintenanceId,
+    oldValue: existingMaintenance,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return updated;
 }

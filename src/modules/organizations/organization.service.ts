@@ -16,12 +16,8 @@ import type {
   OrganizationListQuery,
   UpdateOrganizationInput,
 } from "./organization.schema.js";
+import { AuditInfo } from "../../types/audit.js";
 
-type AuditInfo = {
-  userId: string;
-  ipAddress?: string;
-  userAgent?: string | null;
-};
 
 export async function getOrganizations(
   query: OrganizationListQuery,

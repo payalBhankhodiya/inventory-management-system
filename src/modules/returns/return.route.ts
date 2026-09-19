@@ -22,11 +22,8 @@ import {
   updateReturn,
 } from "./return.service.js";
 
-export const returnRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const returnRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -34,37 +31,30 @@ export const returnRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Returns"],
-        querystring:
-          returnsListQuerySchema,
+        querystring: returnsListQuerySchema,
         response: {
-          200:
-            returnsListResponseSchema,
-          400:
-            returnErrorResponseSchema,
+          200: returnsListResponseSchema,
+          400: returnErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const result =
-          await getReturns(
-            request.user.organizationId,
-            request.query,
-          );
+        const result = await getReturns(
+          request.user.organizationId,
+          request.query,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Returns fetched successfully",
+          message: "Returns fetched successfully",
           ...result,
         });
       } catch (error) {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to fetch returns",
+            error instanceof Error ? error.message : "Failed to fetch returns",
         });
       }
     },
@@ -76,39 +66,30 @@ export const returnRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Returns"],
-        params:
-          returnIdParamSchema,
+        params: returnIdParamSchema,
         response: {
-          200:
-            returnSingleResponseSchema,
-          400:
-            returnErrorResponseSchema,
-          404:
-            returnErrorResponseSchema,
+          200: returnSingleResponseSchema,
+          400: returnErrorResponseSchema,
+          404: returnErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const returnRecord =
-          await getReturnById(
-            request.user.organizationId,
-            request.params.id,
-          );
+        const returnRecord = await getReturnById(
+          request.user.organizationId,
+          request.params.id,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Return fetched successfully",
+          message: "Return fetched successfully",
           data: returnRecord,
         });
       } catch (error) {
         return reply.status(404).send({
           success: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : "Return not found",
+          message: error instanceof Error ? error.message : "Return not found",
         });
       }
     },
@@ -122,33 +103,29 @@ export const returnRoutes = async (
         tags: ["Returns"],
         body: createReturnSchema,
         response: {
-          201:
-            returnSingleResponseSchema,
-          400:
-            returnErrorResponseSchema,
+          201: returnSingleResponseSchema,
+          400: returnErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const returnRecord =
-          await createReturn(
-            request.body,
-          );
+        const returnRecord = await createReturn(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Return created successfully",
+          message: "Return created successfully",
           data: returnRecord,
         });
       } catch (error) {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to create return",
+            error instanceof Error ? error.message : "Failed to create return",
         });
       }
     },
@@ -160,41 +137,38 @@ export const returnRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Returns"],
-        params:
-          returnIdParamSchema,
+        params: returnIdParamSchema,
         body: updateReturnSchema,
         response: {
-          200:
-            returnSingleResponseSchema,
-          400:
-            returnErrorResponseSchema,
-          404:
-            returnErrorResponseSchema,
+          200: returnSingleResponseSchema,
+          400: returnErrorResponseSchema,
+          404: returnErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const returnRecord =
-          await updateReturn(
-            request.user.organizationId,
-            request.params.id,
-            request.body,
-          );
+        const returnRecord = await updateReturn(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Return updated successfully",
+          message: "Return updated successfully",
           data: returnRecord,
         });
       } catch (error) {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to update return",
+            error instanceof Error ? error.message : "Failed to update return",
         });
       }
     },
@@ -206,37 +180,31 @@ export const returnRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Returns"],
-        params:
-          returnIdParamSchema,
+        params: returnIdParamSchema,
         response: {
-          200:
-            deleteReturnResponseSchema,
-          400:
-            returnErrorResponseSchema,
-          404:
-            returnErrorResponseSchema,
+          200: deleteReturnResponseSchema,
+          400: returnErrorResponseSchema,
+          404: returnErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        await deleteReturn(
-          request.user.organizationId,
-          request.params.id,
-        );
+        await deleteReturn(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.send({
           success: true,
-          message:
-            "Return rejected successfully",
+          message: "Return rejected successfully",
         });
       } catch (error) {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to reject return",
+            error instanceof Error ? error.message : "Failed to reject return",
         });
       }
     },

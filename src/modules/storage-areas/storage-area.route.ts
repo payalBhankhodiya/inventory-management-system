@@ -22,9 +22,7 @@ import {
   updateStorageAreaSchema,
 } from "./storage-area.schema.js";
 
-export const storageAreaRoutes = async (
-  app: FastifyInstance,
-) => {
+export const storageAreaRoutes = async (app: FastifyInstance) => {
   const server = app.withTypeProvider<ZodTypeProvider>();
 
   // Get all storage areas
@@ -95,9 +93,7 @@ export const storageAreaRoutes = async (
         return reply.status(404).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Storage area not found",
+            error instanceof Error ? error.message : "Storage area not found",
         });
       }
     },
@@ -119,10 +115,11 @@ export const storageAreaRoutes = async (
     },
     async (request, reply) => {
       try {
-        const storageArea = await createStorageArea(
-          request.body,
-        );
-
+        const storageArea = await createStorageArea(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Storage area created successfully",
@@ -161,6 +158,11 @@ export const storageAreaRoutes = async (
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
@@ -199,6 +201,11 @@ export const storageAreaRoutes = async (
         await deleteStorageArea(
           request.user.organizationId,
           request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({

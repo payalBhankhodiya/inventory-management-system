@@ -8,9 +8,11 @@ import {
   deleteStockTransactionResponseSchema,
   stockTransactionErrorResponseSchema,
   stockTransactionIdParamSchema,
+  stockTransactionResponseSchema,
   stockTransactionSingleResponseSchema,
   stockTransactionsListQuerySchema,
   stockTransactionsListResponseSchema,
+  updateStockTransactionSchema,
 } from "./stock-transaction.schema.js";
 
 import {
@@ -18,11 +20,11 @@ import {
   deleteStockTransaction,
   getStockTransactionById,
   getStockTransactions,
+  updateStockTransaction,
 } from "./stock-transaction.service.js";
+import { errorResponseSchema } from "../departments/department.schema.js";
 
-export const stockTransactionRoutes = async (
-  app: FastifyInstance,
-) => {
+export const stockTransactionRoutes = async (app: FastifyInstance) => {
   const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
@@ -47,8 +49,7 @@ export const stockTransactionRoutes = async (
 
         return reply.send({
           success: true,
-          message:
-            "Stock transactions fetched successfully",
+          message: "Stock transactions fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -79,16 +80,14 @@ export const stockTransactionRoutes = async (
     },
     async (request, reply) => {
       try {
-        const transaction =
-          await getStockTransactionById(
-            request.user.organizationId,
-            request.params.id,
-          );
+        const transaction = await getStockTransactionById(
+          request.user.organizationId,
+          request.params.id,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Stock transaction fetched successfully",
+          message: "Stock transaction fetched successfully",
           data: transaction,
         });
       } catch (error) {
@@ -118,13 +117,15 @@ export const stockTransactionRoutes = async (
     },
     async (request, reply) => {
       try {
-        const transaction =
-          await createStockTransaction(request.body);
+        const transaction = await createStockTransaction(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Stock transaction created successfully",
+          message: "Stock transaction created successfully",
           data: transaction,
         });
       } catch (error) {
@@ -134,6 +135,50 @@ export const stockTransactionRoutes = async (
             error instanceof Error
               ? error.message
               : "Failed to create stock transaction",
+        });
+      }
+    },
+  );
+
+  server.patch(
+    "/:id",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Stock Transactions"],
+        params: stockTransactionIdParamSchema,
+        body: updateStockTransactionSchema,
+        response: {
+          200: stockTransactionSingleResponseSchema,
+          400: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const transaction = await updateStockTransaction(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
+
+        return reply.send({
+          success: true,
+          message: "Stock transaction updated successfully",
+          data: transaction,
+        });
+      } catch (error) {
+        return reply.status(400).send({
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to update stock transaction",
         });
       }
     },
@@ -158,12 +203,16 @@ export const stockTransactionRoutes = async (
         await deleteStockTransaction(
           request.user.organizationId,
           request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
           success: true,
-          message:
-            "Stock transaction deleted successfully",
+          message: "Stock transaction deleted successfully",
         });
       } catch (error) {
         return reply.status(400).send({

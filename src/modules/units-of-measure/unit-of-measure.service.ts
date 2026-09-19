@@ -8,6 +8,8 @@ import type {
   UnitsOfMeasureListQuery,
   UpdateUnitOfMeasureInput,
 } from "./unit-of-measure.schema.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import { AuditInfo } from "../../types/audit.js";
 
 export async function getUnitsOfMeasure(
   organizationId: string,
@@ -77,7 +79,10 @@ export async function getUnitOfMeasureById(
   return unitOfMeasure;
 }
 
-export async function createUnitOfMeasure(input: CreateUnitOfMeasureInput) {
+export async function createUnitOfMeasure(
+  input: CreateUnitOfMeasureInput,
+  auditInfo: AuditInfo,
+) {
   const existingUnit = await db.query.unitsOfMeasure.findFirst({
     where: and(
       eq(unitsOfMeasure.organizationId, input.organizationId),
@@ -104,6 +109,18 @@ export async function createUnitOfMeasure(input: CreateUnitOfMeasureInput) {
     throw new Error("Failed to create unit of measure");
   }
 
+  await createAuditLog({
+    organizationId: unitOfMeasure.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "UNIT_OF_MEASURE",
+    entityId: unitOfMeasure.id,
+    oldValue: null,
+    newValue: unitOfMeasure,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return unitOfMeasure;
 }
 
@@ -111,13 +128,20 @@ export async function updateUnitOfMeasure(
   organizationId: string,
   unitOfMeasureId: string,
   input: UpdateUnitOfMeasureInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingUnit = await getUnitOfMeasureById(
-    organizationId,
-    unitOfMeasureId,
-  );
+  const existingUnitOfMeasure = await db.query.unitsOfMeasure.findFirst({
+    where: and(
+      eq(unitsOfMeasure.id, unitOfMeasureId),
+      eq(unitsOfMeasure.organizationId, organizationId),
+    ),
+  });
 
-  if (input.code && input.code !== existingUnit.code) {
+  if (!existingUnitOfMeasure) {
+    throw new Error("Unit of measure not found");
+  }
+
+  if (input.code && input.code !== existingUnitOfMeasure.code) {
     const duplicateUnit = await db.query.unitsOfMeasure.findFirst({
       where: and(
         eq(unitsOfMeasure.organizationId, organizationId),
@@ -151,19 +175,38 @@ export async function updateUnitOfMeasure(
     throw new Error("Failed to update unit of measure");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "UNIT_OF_MEASURE",
+    entityId: unitOfMeasure.id,
+    oldValue: existingUnitOfMeasure,
+    newValue: unitOfMeasure,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return unitOfMeasure;
 }
 
 export async function deleteUnitOfMeasure(
   organizationId: string,
   unitOfMeasureId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingUnit = await getUnitOfMeasureById(
-    organizationId,
-    unitOfMeasureId,
-  );
+  const existingUnitOfMeasure = await db.query.unitsOfMeasure.findFirst({
+    where: and(
+      eq(unitsOfMeasure.id, unitOfMeasureId),
+      eq(unitsOfMeasure.organizationId, organizationId),
+    ),
+  });
 
-  if (existingUnit.status === "INACTIVE") {
+  if (!existingUnitOfMeasure) {
+    throw new Error("Unit of measure not found");
+  }
+
+  if (existingUnitOfMeasure.status === "INACTIVE") {
     throw new Error("Unit of measure is already inactive");
   }
 
@@ -184,6 +227,18 @@ export async function deleteUnitOfMeasure(
   if (!unitOfMeasure) {
     throw new Error("Failed to deactivate unit of measure");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "UNIT_OF_MEASURE",
+    entityId: unitOfMeasureId,
+    oldValue: existingUnitOfMeasure,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return unitOfMeasure;
 }

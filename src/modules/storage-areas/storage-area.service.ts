@@ -6,6 +6,8 @@ import type {
   StorageAreasListQuery,
   UpdateStorageAreaInput,
 } from "./storage-area.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getStorageAreas(
   organizationId: string,
@@ -83,7 +85,10 @@ export async function getStorageAreaById(
   return storageArea;
 }
 
-export async function createStorageArea(input: CreateStorageAreaInput) {
+export async function createStorageArea(
+  input: CreateStorageAreaInput,
+  auditInfo: AuditInfo,
+) {
   const existingStorageArea = await db.query.storageAreas.findFirst({
     where: and(
       eq(storageAreas.organizationId, input.organizationId),
@@ -112,6 +117,18 @@ export async function createStorageArea(input: CreateStorageAreaInput) {
     throw new Error("Failed to create storage area");
   }
 
+  await createAuditLog({
+    organizationId: storageArea.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "STORAGE_AREA",
+    entityId: storageArea.id,
+    oldValue: null,
+    newValue: storageArea,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return storageArea;
 }
 
@@ -119,11 +136,18 @@ export async function updateStorageArea(
   organizationId: string,
   storageAreaId: string,
   input: UpdateStorageAreaInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingStorageArea = await getStorageAreaById(
-    organizationId,
-    storageAreaId,
-  );
+  const existingStorageArea = await db.query.storageAreas.findFirst({
+    where: and(
+      eq(storageAreas.id, storageAreaId),
+      eq(storageAreas.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingStorageArea) {
+    throw new Error("Storage area not found");
+  }
 
   if (input.code && input.code !== existingStorageArea.code) {
     const duplicateStorageArea = await db.query.storageAreas.findFirst({
@@ -161,17 +185,36 @@ export async function updateStorageArea(
     throw new Error("Failed to update storage area");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "STORAGE_AREA",
+    entityId: storageArea.id,
+    oldValue: existingStorageArea,
+    newValue: storageArea,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return storageArea;
 }
 
 export async function deleteStorageArea(
   organizationId: string,
   storageAreaId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingStorageArea = await getStorageAreaById(
-    organizationId,
-    storageAreaId,
-  );
+  const existingStorageArea = await db.query.storageAreas.findFirst({
+    where: and(
+      eq(storageAreas.id, storageAreaId),
+      eq(storageAreas.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingStorageArea) {
+    throw new Error("Storage area not found");
+  }
 
   if (existingStorageArea.status === "INACTIVE") {
     throw new Error("Storage area is already inactive");
@@ -194,6 +237,18 @@ export async function deleteStorageArea(
   if (!storageArea) {
     throw new Error("Failed to deactivate storage area");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "STORAGE_AREA",
+    entityId: storageArea.id,
+    oldValue: existingStorageArea,
+    newValue: storageArea,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return storageArea;
 }

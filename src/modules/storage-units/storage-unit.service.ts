@@ -6,50 +6,39 @@ import type {
   StorageUnitsListQuery,
   UpdateStorageUnitInput,
 } from "./storage-unit.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getStorageUnits(
   organizationId: string,
   query: StorageUnitsListQuery,
 ) {
-  const conditions = [
-    eq(storageUnits.organizationId, organizationId),
-  ];
+  const conditions = [eq(storageUnits.organizationId, organizationId)];
 
   if (query.search) {
     conditions.push(
       or(
         ilike(storageUnits.name, `%${query.search}%`),
         ilike(storageUnits.code, `%${query.search}%`),
-        ilike(
-          storageUnits.description,
-          `%${query.search}%`,
-        ),
+        ilike(storageUnits.description, `%${query.search}%`),
       )!,
     );
   }
 
   if (query.status) {
-    conditions.push(
-      eq(storageUnits.status, query.status),
-    );
+    conditions.push(eq(storageUnits.status, query.status));
   }
 
   if (query.type) {
-    conditions.push(
-      eq(storageUnits.type, query.type),
-    );
+    conditions.push(eq(storageUnits.type, query.type));
   }
 
   if (query.storageAreaId) {
-    conditions.push(
-      eq(storageUnits.storageAreaId, query.storageAreaId),
-    );
+    conditions.push(eq(storageUnits.storageAreaId, query.storageAreaId));
   }
 
   if (query.parentId) {
-    conditions.push(
-      eq(storageUnits.parentId, query.parentId),
-    );
+    conditions.push(eq(storageUnits.parentId, query.parentId));
   }
 
   const offset = (query.page - 1) * query.limit;
@@ -102,43 +91,32 @@ export async function getStorageUnitById(
 
 export async function createStorageUnit(
   input: CreateStorageUnitInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingStorageUnit =
-    await db.query.storageUnits.findFirst({
-      where: and(
-        eq(
-          storageUnits.organizationId,
-          input.organizationId,
-        ),
-        eq(storageUnits.code, input.code),
-      ),
-    });
+  const existingStorageUnit = await db.query.storageUnits.findFirst({
+    where: and(
+      eq(storageUnits.organizationId, input.organizationId),
+      eq(storageUnits.code, input.code),
+    ),
+  });
 
   if (existingStorageUnit) {
-    throw new Error(
-      "Storage unit with this code already exists",
-    );
+    throw new Error("Storage unit with this code already exists");
   }
 
   if (input.parentId) {
-    const parentUnit =
-      await db.query.storageUnits.findFirst({
-        where: and(
-          eq(storageUnits.id, input.parentId),
-          eq(
-            storageUnits.organizationId,
-            input.organizationId,
-          ),
-        ),
-      });
+    const parentUnit = await db.query.storageUnits.findFirst({
+      where: and(
+        eq(storageUnits.id, input.parentId),
+        eq(storageUnits.organizationId, input.organizationId),
+      ),
+    });
 
     if (!parentUnit) {
       throw new Error("Parent storage unit not found");
     }
 
-    if (
-      parentUnit.storageAreaId !== input.storageAreaId
-    ) {
+    if (parentUnit.storageAreaId !== input.storageAreaId) {
       throw new Error(
         "Parent storage unit must belong to the same storage area",
       );
@@ -164,6 +142,18 @@ export async function createStorageUnit(
     throw new Error("Failed to create storage unit");
   }
 
+  await createAuditLog({
+    organizationId: storageUnit.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "STORAGE_UNIT",
+    entityId: storageUnit.id,
+    oldValue: null,
+    newValue: storageUnit,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return storageUnit;
 }
 
@@ -171,64 +161,52 @@ export async function updateStorageUnit(
   organizationId: string,
   storageUnitId: string,
   input: UpdateStorageUnitInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingStorageUnit =
-    await getStorageUnitById(
-      organizationId,
-      storageUnitId,
-    );
+  const existingStorageUnit = await db.query.storageUnits.findFirst({
+    where: and(
+      eq(storageUnits.id, storageUnitId),
+      eq(storageUnits.organizationId, organizationId),
+    ),
+  });
 
-  if (
-    input.code &&
-    input.code !== existingStorageUnit.code
-  ) {
-    const duplicateStorageUnit =
-      await db.query.storageUnits.findFirst({
-        where: and(
-          eq(
-            storageUnits.organizationId,
-            organizationId,
-          ),
-          eq(storageUnits.code, input.code),
-        ),
-      });
+  if (!existingStorageUnit) {
+    throw new Error("Storage unit not found");
+  }
+
+  if (input.code && input.code !== existingStorageUnit.code) {
+    const duplicateStorageUnit = await db.query.storageUnits.findFirst({
+      where: and(
+        eq(storageUnits.organizationId, organizationId),
+        eq(storageUnits.code, input.code),
+      ),
+    });
 
     if (duplicateStorageUnit) {
-      throw new Error(
-        "Storage unit with this code already exists",
-      );
+      throw new Error("Storage unit with this code already exists");
     }
   }
 
   const targetStorageAreaId =
-    input.storageAreaId ??
-    existingStorageUnit.storageAreaId;
+    input.storageAreaId ?? existingStorageUnit.storageAreaId;
 
   if (input.parentId) {
     if (input.parentId === storageUnitId) {
-      throw new Error(
-        "Storage unit cannot be its own parent",
-      );
+      throw new Error("Storage unit cannot be its own parent");
     }
 
-    const parentUnit =
-      await db.query.storageUnits.findFirst({
-        where: and(
-          eq(storageUnits.id, input.parentId),
-          eq(
-            storageUnits.organizationId,
-            organizationId,
-          ),
-        ),
-      });
+    const parentUnit = await db.query.storageUnits.findFirst({
+      where: and(
+        eq(storageUnits.id, input.parentId),
+        eq(storageUnits.organizationId, organizationId),
+      ),
+    });
 
     if (!parentUnit) {
       throw new Error("Parent storage unit not found");
     }
 
-    if (
-      parentUnit.storageAreaId !== targetStorageAreaId
-    ) {
+    if (parentUnit.storageAreaId !== targetStorageAreaId) {
       throw new Error(
         "Parent storage unit must belong to the same storage area",
       );
@@ -251,10 +229,7 @@ export async function updateStorageUnit(
     .where(
       and(
         eq(storageUnits.id, storageUnitId),
-        eq(
-          storageUnits.organizationId,
-          organizationId,
-        ),
+        eq(storageUnits.organizationId, organizationId),
       ),
     )
     .returning();
@@ -263,23 +238,39 @@ export async function updateStorageUnit(
     throw new Error("Failed to update storage unit");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "STORAGE_UNIT",
+    entityId: storageUnit.id,
+    oldValue: existingStorageUnit,
+    newValue: storageUnit,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return storageUnit;
 }
 
 export async function deleteStorageUnit(
   organizationId: string,
   storageUnitId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingStorageUnit =
-    await getStorageUnitById(
-      organizationId,
-      storageUnitId,
-    );
+  const existingStorageUnit = await db.query.storageUnits.findFirst({
+    where: and(
+      eq(storageUnits.id, storageUnitId),
+      eq(storageUnits.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingStorageUnit) {
+    throw new Error("Storage unit not found");
+  }
 
   if (existingStorageUnit.status === "INACTIVE") {
-    throw new Error(
-      "Storage unit is already inactive",
-    );
+    throw new Error("Storage unit is already inactive");
   }
 
   const [storageUnit] = await db
@@ -291,19 +282,26 @@ export async function deleteStorageUnit(
     .where(
       and(
         eq(storageUnits.id, storageUnitId),
-        eq(
-          storageUnits.organizationId,
-          organizationId,
-        ),
+        eq(storageUnits.organizationId, organizationId),
       ),
     )
     .returning();
 
   if (!storageUnit) {
-    throw new Error(
-      "Failed to deactivate storage unit",
-    );
+    throw new Error("Failed to deactivate storage unit");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "STORAGE_UNIT",
+    entityId: storageUnit.id,
+    oldValue: existingStorageUnit,
+    newValue: storageUnit,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return storageUnit;
 }

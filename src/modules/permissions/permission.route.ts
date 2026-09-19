@@ -22,11 +22,8 @@ import {
   updatePermission,
 } from "./permission.service.js";
 
-export const permissionRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const permissionRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -34,27 +31,20 @@ export const permissionRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Permissions"],
-        querystring:
-          permissionListQuerySchema,
+        querystring: permissionListQuerySchema,
         response: {
-          200:
-            permissionListResponseSchema,
-          400:
-            permissionErrorResponseSchema,
+          200: permissionListResponseSchema,
+          400: permissionErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const result =
-          await getPermissions(
-            request.query,
-          );
+        const result = await getPermissions(request.query);
 
         return reply.send({
           success: true,
-          message:
-            "Permissions fetched successfully",
+          message: "Permissions fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -75,36 +65,27 @@ export const permissionRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Permissions"],
-        params:
-          permissionIdParamSchema,
+        params: permissionIdParamSchema,
         response: {
-          200:
-            permissionSingleResponseSchema,
-          404:
-            permissionErrorResponseSchema,
+          200: permissionSingleResponseSchema,
+          404: permissionErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const permission =
-          await getPermissionById(
-            request.params.id,
-          );
+        const permission = await getPermissionById(request.params.id);
 
         return reply.send({
           success: true,
-          message:
-            "Permission fetched successfully",
+          message: "Permission fetched successfully",
           data: permission,
         });
       } catch (error) {
         return reply.status(404).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Permission not found",
+            error instanceof Error ? error.message : "Permission not found",
         });
       }
     },
@@ -118,24 +99,26 @@ export const permissionRoutes = async (
         tags: ["Permissions"],
         body: createPermissionSchema,
         response: {
-          201:
-            permissionSingleResponseSchema,
-          400:
-            permissionErrorResponseSchema,
+          201: permissionSingleResponseSchema,
+          400: permissionErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const permission =
-          await createPermission(
-            request.body,
-          );
+        const permission = await createPermission(
+  request.user.organizationId,
+  request.body,
+  {
+    userId: request.user.userId,
+    ipAddress: request.ip,
+    userAgent: request.headers["user-agent"] ?? null,
+  },
+);
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Permission created successfully",
+          message: "Permission created successfully",
           data: permission,
         });
       } catch (error) {
@@ -156,31 +139,31 @@ export const permissionRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Permissions"],
-        params:
-          permissionIdParamSchema,
+        params: permissionIdParamSchema,
         body: updatePermissionSchema,
         response: {
-          200:
-            permissionSingleResponseSchema,
-          400:
-            permissionErrorResponseSchema,
-          404:
-            permissionErrorResponseSchema,
+          200: permissionSingleResponseSchema,
+          400: permissionErrorResponseSchema,
+          404: permissionErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const permission =
-          await updatePermission(
-            request.params.id,
-            request.body,
-          );
+        const permission = await updatePermission(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Permission updated successfully",
+          message: "Permission updated successfully",
           data: permission,
         });
       } catch (error) {
@@ -201,28 +184,25 @@ export const permissionRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Permissions"],
-        params:
-          permissionIdParamSchema,
+        params: permissionIdParamSchema,
         response: {
-          200:
-            permissionDeleteResponseSchema,
-          400:
-            permissionErrorResponseSchema,
-          404:
-            permissionErrorResponseSchema,
+          200: permissionDeleteResponseSchema,
+          400: permissionErrorResponseSchema,
+          404: permissionErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        await deletePermission(
-          request.params.id,
-        );
+        await deletePermission(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.send({
           success: true,
-          message:
-            "Permission deleted successfully",
+          message: "Permission deleted successfully",
         });
       } catch (error) {
         return reply.status(400).send({

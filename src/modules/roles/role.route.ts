@@ -25,11 +25,8 @@ import {
   updateRole,
 } from "./role.service.js";
 
-export const roleRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const roleRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   // Get Roles
   server.get(
@@ -48,10 +45,7 @@ export const roleRoutes = async (
       },
     },
     async (request, reply) => {
-      const result = await getRoles(
-        request.user.organizationId,
-        request.query,
-      );
+      const result = await getRoles(request.user.organizationId, request.query);
 
       return reply.send({
         success: true,
@@ -108,9 +102,11 @@ export const roleRoutes = async (
       },
     },
     async (request, reply) => {
-      const role = await createRole(
-        request.body,
-      );
+      const role = await createRole(request.body, {
+        userId: request.user.userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
 
       return reply.status(201).send({
         success: true,
@@ -143,6 +139,11 @@ export const roleRoutes = async (
         request.user.organizationId,
         request.params.id,
         request.body,
+        {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        },
       );
 
       return reply.send({
@@ -170,11 +171,11 @@ export const roleRoutes = async (
       },
     },
     async (request, reply) => {
-      await deleteRole(
-        request.user.organizationId,
-        request.params.id,
-      );
-
+      await deleteRole(request.user.organizationId, request.params.id, {
+        userId: request.user.userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"] ?? null,
+      });
       return reply.send({
         success: true,
         message: "Role deactivated successfully",
@@ -199,16 +200,14 @@ export const roleRoutes = async (
       },
     },
     async (request, reply) => {
-      const permissions =
-        await getRolePermissions(
-          request.user.organizationId,
-          request.params.id,
-        );
+      const permissions = await getRolePermissions(
+        request.user.organizationId,
+        request.params.id,
+      );
 
       return reply.send({
         success: true,
-        message:
-          "Role permissions retrieved successfully",
+        message: "Role permissions retrieved successfully",
         data: permissions,
       });
     },
@@ -233,17 +232,20 @@ export const roleRoutes = async (
       },
     },
     async (request, reply) => {
-      const permissions =
-        await assignPermissions(
-          request.user.organizationId,
-          request.params.id,
-          request.body.permissionIds,
-        );
+      const permissions = await assignPermissions(
+        request.user.organizationId,
+        request.params.id,
+        request.body.permissionIds,
+        {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        },
+      );
 
       return reply.send({
         success: true,
-        message:
-          "Role permissions updated successfully",
+        message: "Role permissions updated successfully",
         data: permissions,
       });
     },

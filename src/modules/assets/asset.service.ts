@@ -8,6 +8,8 @@ import type {
   CreateAssetInput,
   UpdateAssetInput,
 } from "./asset.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getAssets(
   organizationId: string,
@@ -102,7 +104,10 @@ export async function getAssetById(organizationId: string, assetId: string) {
   return asset;
 }
 
-export async function createAsset(input: CreateAssetInput) {
+export async function createAsset(
+  input: CreateAssetInput,
+  auditInfo: AuditInfo,
+) {
   const existingAsset = await db.query.assets.findFirst({
     where: eq(assets.assetTag, input.assetTag),
   });
@@ -143,6 +148,18 @@ export async function createAsset(input: CreateAssetInput) {
     throw new Error("Failed to create asset");
   }
 
+  await createAuditLog({
+    organizationId: asset.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "ASSET",
+    entityId: asset.id,
+    oldValue: null,
+    newValue: asset,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return asset;
 }
 
@@ -150,8 +167,18 @@ export async function updateAsset(
   organizationId: string,
   assetId: string,
   input: UpdateAssetInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingAsset = await getAssetById(organizationId, assetId);
+  const existingAsset = await db.query.assets.findFirst({
+    where: and(
+      eq(assets.id, assetId),
+      eq(assets.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingAsset) {
+    throw new Error("Asset not found");
+  }
 
   if (input.assetTag && input.assetTag !== existingAsset.assetTag) {
     const assetTagExists = await db.query.assets.findFirst({
@@ -199,11 +226,36 @@ export async function updateAsset(
     throw new Error("Failed to update asset");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "ASSET",
+    entityId: asset.id,
+    oldValue: existingAsset,
+    newValue: asset,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return asset;
 }
 
-export async function deleteAsset(organizationId: string, assetId: string) {
-  const existingAsset = await getAssetById(organizationId, assetId);
+export async function deleteAsset(
+  organizationId: string,
+  assetId: string,
+  auditInfo: AuditInfo,
+) {
+  const existingAsset = await db.query.assets.findFirst({
+    where: and(
+      eq(assets.id, assetId),
+      eq(assets.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingAsset) {
+    throw new Error("Asset not found");
+  }
 
   if (existingAsset.status === "DISPOSED") {
     throw new Error("Asset is already disposed");
@@ -223,6 +275,18 @@ export async function deleteAsset(organizationId: string, assetId: string) {
   if (!asset) {
     throw new Error("Failed to dispose asset");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "ASSET",
+    entityId: assetId,
+    oldValue: existingAsset,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return asset;
 }

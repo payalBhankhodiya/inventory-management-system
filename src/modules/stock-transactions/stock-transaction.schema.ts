@@ -121,6 +121,67 @@ export const stockTransactionsListResponseSchema = z.object({
   }),
 });
 
+export const updateStockTransactionSchema = z.object({
+  transactionNo: z.string().min(1).max(100),
+
+  type: stockTransactionTypeSchema,
+
+  referenceType: z.string().nullable().optional(),
+
+  referenceId: z.uuid().nullable().optional(),
+
+  reason: z.string().max(500).nullable().optional(),
+
+  remarks: z.string().max(1000).nullable().optional(),
+
+  performedBy: z.uuid(),
+
+  items: z
+    .array(
+      z.object({
+        itemId: z.uuid(),
+
+        fromStorageAreaId: z
+          .uuid()
+          .nullable()
+          .optional(),
+
+        fromStorageUnitId: z
+          .uuid()
+          .nullable()
+          .optional(),
+
+        toStorageAreaId: z
+          .uuid()
+          .nullable()
+          .optional(),
+
+        toStorageUnitId: z
+          .uuid()
+          .nullable()
+          .optional(),
+
+        quantity: z.string().min(1),
+
+        unitCost: z
+          .string()
+          .nullable()
+          .optional(),
+
+        remarks: z
+          .string()
+          .max(500)
+          .nullable()
+          .optional(),
+      }),
+    )
+    .min(1),
+});
+
+export type UpdateStockTransactionInput = z.infer<
+  typeof updateStockTransactionSchema
+>;
+
 export const deleteStockTransactionResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),

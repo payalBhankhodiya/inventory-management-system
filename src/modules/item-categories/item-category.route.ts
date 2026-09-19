@@ -112,8 +112,11 @@ export const itemCategoryRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const itemCategory = await createItemCategory(request.body);
-
+        const itemCategory = await createItemCategory(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Item category created successfully",
@@ -151,6 +154,11 @@ export const itemCategoryRoutes = async (app: FastifyInstance) => {
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
@@ -188,6 +196,11 @@ export const itemCategoryRoutes = async (app: FastifyInstance) => {
         await deleteItemCategory(
           request.user.organizationId,
           request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({

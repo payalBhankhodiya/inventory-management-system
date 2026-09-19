@@ -114,8 +114,11 @@ export const unitOfMeasureRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const unitOfMeasure = await createUnitOfMeasure(request.body);
-
+        const unitOfMeasure = await createUnitOfMeasure(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Unit of measure created successfully",
@@ -153,6 +156,11 @@ export const unitOfMeasureRoutes = async (app: FastifyInstance) => {
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
@@ -190,6 +198,11 @@ export const unitOfMeasureRoutes = async (app: FastifyInstance) => {
         await deleteUnitOfMeasure(
           request.user.organizationId,
           request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({

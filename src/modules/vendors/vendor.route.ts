@@ -110,8 +110,11 @@ export const vendorRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const vendor = await createVendor(request.body);
-
+        const vendor = await createVendor(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Vendor created successfully",
@@ -148,6 +151,11 @@ export const vendorRoutes = async (app: FastifyInstance) => {
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
@@ -181,8 +189,11 @@ export const vendorRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        await deleteVendor(request.user.organizationId, request.params.id);
-
+        await deleteVendor(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.send({
           success: true,
           message: "Vendor deactivated successfully",

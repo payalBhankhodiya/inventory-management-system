@@ -22,11 +22,8 @@ import {
   updateAssignment,
 } from "./assignment.service.js";
 
-export const assignmentRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const assignmentRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -34,28 +31,23 @@ export const assignmentRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Assignments"],
-        querystring:
-          assignmentsListQuerySchema,
+        querystring: assignmentsListQuerySchema,
         response: {
-          200:
-            assignmentsListResponseSchema,
-          400:
-            assignmentErrorResponseSchema,
+          200: assignmentsListResponseSchema,
+          400: assignmentErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const result =
-          await getAssignments(
-            request.user.organizationId,
-            request.query,
-          );
+        const result = await getAssignments(
+          request.user.organizationId,
+          request.query,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Assignments fetched successfully",
+          message: "Assignments fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -76,39 +68,31 @@ export const assignmentRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Assignments"],
-        params:
-          assignmentIdParamSchema,
+        params: assignmentIdParamSchema,
         response: {
-          200:
-            assignmentSingleResponseSchema,
-          400:
-            assignmentErrorResponseSchema,
-          404:
-            assignmentErrorResponseSchema,
+          200: assignmentSingleResponseSchema,
+          400: assignmentErrorResponseSchema,
+          404: assignmentErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const assignment =
-          await getAssignmentById(
-            request.user.organizationId,
-            request.params.id,
-          );
+        const assignment = await getAssignmentById(
+          request.user.organizationId,
+          request.params.id,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Assignment fetched successfully",
+          message: "Assignment fetched successfully",
           data: assignment,
         });
       } catch (error) {
         return reply.status(404).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Assignment not found",
+            error instanceof Error ? error.message : "Assignment not found",
         });
       }
     },
@@ -122,24 +106,22 @@ export const assignmentRoutes = async (
         tags: ["Assignments"],
         body: createAssignmentSchema,
         response: {
-          201:
-            assignmentSingleResponseSchema,
-          400:
-            assignmentErrorResponseSchema,
+          201: assignmentSingleResponseSchema,
+          400: assignmentErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const assignment =
-          await createAssignment(
-            request.body,
-          );
+        const assignment = await createAssignment(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Assignment created successfully",
+          message: "Assignment created successfully",
           data: assignment,
         });
       } catch (error) {
@@ -160,32 +142,30 @@ export const assignmentRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Assignments"],
-        params:
-          assignmentIdParamSchema,
+        params: assignmentIdParamSchema,
         body: updateAssignmentSchema,
         response: {
-          200:
-            assignmentSingleResponseSchema,
-          400:
-            assignmentErrorResponseSchema,
-          404:
-            assignmentErrorResponseSchema,
+          200: assignmentSingleResponseSchema,
+          400: assignmentErrorResponseSchema,
+          404: assignmentErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        const assignment =
-          await updateAssignment(
-            request.user.organizationId,
-            request.params.id,
-            request.body,
-          );
-
+        const assignment = await updateAssignment(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
         return reply.send({
           success: true,
-          message:
-            "Assignment updated successfully",
+          message: "Assignment updated successfully",
           data: assignment,
         });
       } catch (error) {
@@ -206,29 +186,24 @@ export const assignmentRoutes = async (
       preHandler: authenticate,
       schema: {
         tags: ["Assignments"],
-        params:
-          assignmentIdParamSchema,
+        params: assignmentIdParamSchema,
         response: {
-          200:
-            deleteAssignmentResponseSchema,
-          400:
-            assignmentErrorResponseSchema,
-          404:
-            assignmentErrorResponseSchema,
+          200: deleteAssignmentResponseSchema,
+          400: assignmentErrorResponseSchema,
+          404: assignmentErrorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       try {
-        await deleteAssignment(
-          request.user.organizationId,
-          request.params.id,
-        );
-
+        await deleteAssignment(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.send({
           success: true,
-          message:
-            "Assignment cancelled successfully",
+          message: "Assignment cancelled successfully",
         });
       } catch (error) {
         return reply.status(400).send({

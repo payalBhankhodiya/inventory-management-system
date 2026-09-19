@@ -6,14 +6,14 @@ import type {
   DepartmentsListQuery,
   UpdateDepartmentInput,
 } from "./department.schema.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import { AuditInfo } from "../../types/audit.js";
 
 export async function getDepartments(
   organizationId: string,
   query: DepartmentsListQuery,
 ) {
-  const conditions = [
-    eq(departments.organizationId, organizationId),
-  ];
+  const conditions = [eq(departments.organizationId, organizationId)];
 
   if (query.search) {
     conditions.push(
@@ -83,6 +83,7 @@ export async function getDepartmentById(
 
 export async function createDepartment(
   input: CreateDepartmentInput,
+  auditInfo: AuditInfo,
 ) {
   const existingDepartment = await db.query.departments.findFirst({
     where: and(
@@ -112,6 +113,18 @@ export async function createDepartment(
     throw new Error("Failed to create department");
   }
 
+  await createAuditLog({
+    organizationId: department.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "DEPARTMENT",
+    entityId: department.id,
+    oldValue: null,
+    newValue: department,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return department;
 }
 
@@ -119,11 +132,18 @@ export async function updateDepartment(
   organizationId: string,
   departmentId: string,
   input: UpdateDepartmentInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingDepartment = await getDepartmentById(
-    organizationId,
-    departmentId,
-  );
+  const existingDepartment = await db.query.departments.findFirst({
+    where: and(
+      eq(departments.id, departmentId),
+      eq(departments.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingDepartment) {
+    throw new Error("Department not found");
+  }
 
   if (input.code && input.code !== existingDepartment.code) {
     const duplicateDepartment = await db.query.departments.findFirst({
@@ -161,17 +181,36 @@ export async function updateDepartment(
     throw new Error("Failed to update department");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "DEPARTMENT",
+    entityId: department.id,
+    oldValue: existingDepartment,
+    newValue: department,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return department;
 }
 
 export async function deleteDepartment(
   organizationId: string,
   departmentId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingDepartment = await getDepartmentById(
-    organizationId,
-    departmentId,
-  );
+  const existingDepartment = await db.query.departments.findFirst({
+    where: and(
+      eq(departments.id, departmentId),
+      eq(departments.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingDepartment) {
+    throw new Error("Department not found");
+  }
 
   if (existingDepartment.status === "INACTIVE") {
     throw new Error("Department is already inactive");
@@ -194,6 +233,18 @@ export async function deleteDepartment(
   if (!department) {
     throw new Error("Failed to deactivate department");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "DEPARTMENT",
+    entityId: department.id,
+    oldValue: existingDepartment,
+    newValue: department,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return department;
 }

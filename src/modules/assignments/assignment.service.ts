@@ -8,6 +8,8 @@ import type {
   CreateAssignmentInput,
   UpdateAssignmentInput,
 } from "./assignment.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getAssignments(
   organizationId: string,
@@ -91,7 +93,10 @@ export async function getAssignmentById(
   return assignment;
 }
 
-export async function createAssignment(input: CreateAssignmentInput) {
+export async function createAssignment(
+  input: CreateAssignmentInput,
+  auditInfo: AuditInfo,
+) {
   const existingAssignment = await db.query.assignments.findFirst({
     where: and(
       eq(assignments.organizationId, input.organizationId),
@@ -133,6 +138,18 @@ export async function createAssignment(input: CreateAssignmentInput) {
     throw new Error("Failed to create assignment");
   }
 
+  await createAuditLog({
+    organizationId: assignment.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "ASSIGNMENT",
+    entityId: assignment.id,
+    oldValue: null,
+    newValue: assignment,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return assignment;
 }
 
@@ -140,8 +157,18 @@ export async function updateAssignment(
   organizationId: string,
   assignmentId: string,
   input: UpdateAssignmentInput,
+  auditInfo: AuditInfo,
 ) {
-  await getAssignmentById(organizationId, assignmentId);
+  const existingAssignment = await db.query.assignments.findFirst({
+    where: and(
+      eq(assignments.id, assignmentId),
+      eq(assignments.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingAssignment) {
+    throw new Error("Assignment not found");
+  }
 
   const [assignment] = await db
     .update(assignments)
@@ -188,17 +215,36 @@ export async function updateAssignment(
     throw new Error("Failed to update assignment");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "ASSIGNMENT",
+    entityId: assignment.id,
+    oldValue: existingAssignment,
+    newValue: assignment,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return assignment;
 }
 
 export async function deleteAssignment(
   organizationId: string,
   assignmentId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingAssignment = await getAssignmentById(
-    organizationId,
-    assignmentId,
-  );
+  const existingAssignment = await db.query.assignments.findFirst({
+    where: and(
+      eq(assignments.id, assignmentId),
+      eq(assignments.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingAssignment) {
+    throw new Error("Assignment not found");
+  }
 
   if (existingAssignment.status === "CANCELLED") {
     throw new Error("Assignment is already cancelled");
@@ -221,6 +267,18 @@ export async function deleteAssignment(
   if (!assignment) {
     throw new Error("Failed to cancel assignment");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "ASSIGNMENT",
+    entityId: assignmentId,
+    oldValue: existingAssignment,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return assignment;
 }

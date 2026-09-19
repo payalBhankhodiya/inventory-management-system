@@ -8,6 +8,8 @@ import type {
   UpdateVendorInput,
   VendorsListQuery,
 } from "./vendor.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getVendors(
   organizationId: string,
@@ -76,7 +78,10 @@ export async function getVendorById(organizationId: string, vendorId: string) {
   return vendor;
 }
 
-export async function createVendor(input: CreateVendorInput) {
+export async function createVendor(
+  input: CreateVendorInput,
+  auditInfo: AuditInfo,
+) {
   const existingVendor = await db.query.vendors.findFirst({
     where: and(
       eq(vendors.organizationId, input.organizationId),
@@ -107,6 +112,18 @@ export async function createVendor(input: CreateVendorInput) {
     throw new Error("Failed to create vendor");
   }
 
+  await createAuditLog({
+    organizationId: vendor.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "VENDOR",
+    entityId: vendor.id,
+    oldValue: null,
+    newValue: vendor,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return vendor;
 }
 
@@ -114,8 +131,18 @@ export async function updateVendor(
   organizationId: string,
   vendorId: string,
   input: UpdateVendorInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingVendor = await getVendorById(organizationId, vendorId);
+  const existingVendor = await db.query.vendors.findFirst({
+    where: and(
+      eq(vendors.id, vendorId),
+      eq(vendors.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingVendor) {
+    throw new Error("Vendor not found");
+  }
 
   if (input.code && input.code !== existingVendor.code) {
     const codeExists = await db.query.vendors.findFirst({
@@ -152,11 +179,36 @@ export async function updateVendor(
     throw new Error("Failed to update vendor");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "VENDOR",
+    entityId: vendor.id,
+    oldValue: existingVendor,
+    newValue: vendor,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return vendor;
 }
 
-export async function deleteVendor(organizationId: string, vendorId: string) {
-  const existingVendor = await getVendorById(organizationId, vendorId);
+export async function deleteVendor(
+  organizationId: string,
+  vendorId: string,
+  auditInfo: AuditInfo,
+) {
+  const existingVendor = await db.query.vendors.findFirst({
+    where: and(
+      eq(vendors.id, vendorId),
+      eq(vendors.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingVendor) {
+    throw new Error("Vendor not found");
+  }
 
   if (existingVendor.status === "INACTIVE") {
     throw new Error("Vendor is already inactive");
@@ -176,6 +228,18 @@ export async function deleteVendor(organizationId: string, vendorId: string) {
   if (!vendor) {
     throw new Error("Failed to deactivate vendor");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "VENDOR",
+    entityId: vendorId,
+    oldValue: existingVendor,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return vendor;
 }

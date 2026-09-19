@@ -22,11 +22,8 @@ import {
   updateDisposal,
 } from "./disposal.service.js";
 
-export const disposalRoutes = async (
-  app: FastifyInstance,
-) => {
-  const server =
-    app.withTypeProvider<ZodTypeProvider>();
+export const disposalRoutes = async (app: FastifyInstance) => {
+  const server = app.withTypeProvider<ZodTypeProvider>();
 
   server.get(
     "/",
@@ -43,16 +40,14 @@ export const disposalRoutes = async (
     },
     async (request, reply) => {
       try {
-        const result =
-          await getDisposals(
-            request.user.organizationId,
-            request.query,
-          );
+        const result = await getDisposals(
+          request.user.organizationId,
+          request.query,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Disposal records fetched successfully",
+          message: "Disposal records fetched successfully",
           ...result,
         });
       } catch (error) {
@@ -82,16 +77,14 @@ export const disposalRoutes = async (
     },
     async (request, reply) => {
       try {
-        const disposal =
-          await getDisposalById(
-            request.user.organizationId,
-            request.params.id,
-          );
+        const disposal = await getDisposalById(
+          request.user.organizationId,
+          request.params.id,
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Disposal record fetched successfully",
+          message: "Disposal record fetched successfully",
           data: disposal,
         });
       } catch (error) {
@@ -121,15 +114,15 @@ export const disposalRoutes = async (
     },
     async (request, reply) => {
       try {
-        const disposal =
-          await createDisposal(
-            request.body,
-          );
+        const disposal = await createDisposal(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.status(201).send({
           success: true,
-          message:
-            "Disposal record created successfully",
+          message: "Disposal record created successfully",
           data: disposal,
         });
       } catch (error) {
@@ -161,17 +154,20 @@ export const disposalRoutes = async (
     },
     async (request, reply) => {
       try {
-        const disposal =
-          await updateDisposal(
-            request.user.organizationId,
-            request.params.id,
-            request.body,
-          );
+        const disposal = await updateDisposal(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.send({
           success: true,
-          message:
-            "Disposal record updated successfully",
+          message: "Disposal record updated successfully",
           data: disposal,
         });
       } catch (error) {
@@ -202,15 +198,15 @@ export const disposalRoutes = async (
     },
     async (request, reply) => {
       try {
-        await deleteDisposal(
-          request.user.organizationId,
-          request.params.id,
-        );
+        await deleteDisposal(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.send({
           success: true,
-          message:
-            "Disposal record deleted successfully",
+          message: "Disposal record deleted successfully",
         });
       } catch (error) {
         return reply.status(400).send({

@@ -8,6 +8,8 @@ import type {
   DisposalListQuery,
   UpdateDisposalInput,
 } from "./disposal.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
 export async function getDisposals(
   organizationId: string,
@@ -88,7 +90,10 @@ export async function getDisposalById(
   return disposal;
 }
 
-export async function createDisposal(input: CreateDisposalInput) {
+export async function createDisposal(
+  input: CreateDisposalInput,
+  auditInfo: AuditInfo,
+) {
   const existingDisposal = await db.query.disposals.findFirst({
     where: and(
       eq(disposals.organizationId, input.organizationId),
@@ -125,6 +130,18 @@ export async function createDisposal(input: CreateDisposalInput) {
     throw new Error("Failed to create disposal record");
   }
 
+  await createAuditLog({
+    organizationId: disposal.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "DISPOSAL",
+    entityId: disposal.id,
+    oldValue: null,
+    newValue: disposal,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return disposal;
 }
 
@@ -132,8 +149,18 @@ export async function updateDisposal(
   organizationId: string,
   disposalId: string,
   input: UpdateDisposalInput,
+  auditInfo: AuditInfo,
 ) {
-  await getDisposalById(organizationId, disposalId);
+  const existingDisposal = await db.query.disposals.findFirst({
+    where: and(
+      eq(disposals.id, disposalId),
+      eq(disposals.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingDisposal) {
+    throw new Error("Disposal not found");
+  }
 
   const [disposal] = await db
     .update(disposals)
@@ -168,14 +195,36 @@ export async function updateDisposal(
     throw new Error("Failed to update disposal record");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "DISPOSAL",
+    entityId: disposal.id,
+    oldValue: existingDisposal,
+    newValue: disposal,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return disposal;
 }
 
 export async function deleteDisposal(
   organizationId: string,
   disposalId: string,
+  auditInfo: AuditInfo,
 ) {
-  await getDisposalById(organizationId, disposalId);
+  const existingDisposal = await db.query.disposals.findFirst({
+    where: and(
+      eq(disposals.id, disposalId),
+      eq(disposals.organizationId, organizationId),
+    ),
+  });
+
+  if (!existingDisposal) {
+    throw new Error("Disposal not found");
+  }
 
   await db
     .delete(disposals)
@@ -185,6 +234,18 @@ export async function deleteDisposal(
         eq(disposals.organizationId, organizationId),
       ),
     );
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "DISPOSAL",
+    entityId: disposalId,
+    oldValue: existingDisposal,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return true;
 }

@@ -42,10 +42,7 @@ export const itemRoutes = async (app: FastifyInstance) => {
       try {
         const organizationId = request.user.organizationId;
 
-        const result = await getItems(
-          organizationId,
-          request.query,
-        );
+        const result = await getItems(organizationId, request.query);
 
         return reply.send({
           success: true,
@@ -56,9 +53,7 @@ export const itemRoutes = async (app: FastifyInstance) => {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to fetch items",
+            error instanceof Error ? error.message : "Failed to fetch items",
         });
       }
     },
@@ -93,10 +88,7 @@ export const itemRoutes = async (app: FastifyInstance) => {
       } catch (error) {
         return reply.status(404).send({
           success: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : "Item not found",
+          message: error instanceof Error ? error.message : "Item not found",
         });
       }
     },
@@ -117,8 +109,11 @@ export const itemRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const item = await createItem(request.body);
-
+        const item = await createItem(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Item created successfully",
@@ -128,9 +123,7 @@ export const itemRoutes = async (app: FastifyInstance) => {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to create item",
+            error instanceof Error ? error.message : "Failed to create item",
         });
       }
     },
@@ -157,6 +150,11 @@ export const itemRoutes = async (app: FastifyInstance) => {
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
@@ -168,9 +166,7 @@ export const itemRoutes = async (app: FastifyInstance) => {
         return reply.status(400).send({
           success: false,
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to update item",
+            error instanceof Error ? error.message : "Failed to update item",
         });
       }
     },
@@ -192,10 +188,11 @@ export const itemRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        await deleteItem(
-          request.user.organizationId,
-          request.params.id,
-        );
+        await deleteItem(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
 
         return reply.send({
           success: true,

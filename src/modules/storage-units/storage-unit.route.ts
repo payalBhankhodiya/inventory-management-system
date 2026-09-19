@@ -112,8 +112,11 @@ export const storageUnitRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const storageUnit = await createStorageUnit(request.body);
-
+        const storageUnit = await createStorageUnit(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Storage unit created successfully",
@@ -151,6 +154,11 @@ export const storageUnitRoutes = async (app: FastifyInstance) => {
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
 
         return reply.send({
@@ -185,8 +193,15 @@ export const storageUnitRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        await deleteStorageUnit(request.user.organizationId, request.params.id);
-
+        await deleteStorageUnit(
+          request.user.organizationId,
+          request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
         return reply.send({
           success: true,
           message: "Storage unit deactivated successfully",

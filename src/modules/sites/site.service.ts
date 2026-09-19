@@ -8,6 +8,8 @@ import type {
   SitesListQuery,
   UpdateSiteInput,
 } from "./site.schema.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import { AuditInfo } from "../../types/audit.js";
 
 export async function getSites(organizationId: string, query: SitesListQuery) {
   const conditions = [eq(sites.organizationId, organizationId)];
@@ -72,7 +74,7 @@ export async function getSiteById(organizationId: string, siteId: string) {
   return site;
 }
 
-export async function createSite(input: CreateSiteInput) {
+export async function createSite(input: CreateSiteInput, auditInfo: AuditInfo) {
   const existingSite = await db.query.sites.findFirst({
     where: and(
       eq(sites.organizationId, input.organizationId),
@@ -111,6 +113,18 @@ export async function createSite(input: CreateSiteInput) {
     throw new Error("Failed to create site");
   }
 
+  await createAuditLog({
+    organizationId: site.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "SITE",
+    entityId: site.id,
+    oldValue: null,
+    newValue: site,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return site;
 }
 
@@ -118,9 +132,15 @@ export async function updateSite(
   organizationId: string,
   siteId: string,
   input: UpdateSiteInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingSite = await getSiteById(organizationId, siteId);
+  const existingSite = await db.query.sites.findFirst({
+    where: and(eq(sites.id, siteId), eq(sites.organizationId, organizationId)),
+  });
 
+  if (!existingSite) {
+    throw new Error("Site not found");
+  }
   if (input.code && input.code !== existingSite.code) {
     const duplicateSite = await db.query.sites.findFirst({
       where: and(
@@ -162,12 +182,33 @@ export async function updateSite(
     throw new Error("Failed to update site");
   }
 
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "SITE",
+    entityId: site.id,
+    oldValue: existingSite,
+    newValue: site,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return site;
 }
 
-export async function deleteSite(organizationId: string, siteId: string) {
-  const existingSite = await getSiteById(organizationId, siteId);
+export async function deleteSite(
+  organizationId: string,
+  siteId: string,
+  auditInfo: AuditInfo,
+) {
+  const existingSite = await db.query.sites.findFirst({
+    where: and(eq(sites.id, siteId), eq(sites.organizationId, organizationId)),
+  });
 
+  if (!existingSite) {
+    throw new Error("Site not found");
+  }
   if (existingSite.status === "INACTIVE") {
     throw new Error("Site is already inactive");
   }
@@ -184,6 +225,18 @@ export async function deleteSite(organizationId: string, siteId: string) {
   if (!site) {
     throw new Error("Failed to deactivate site");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "SITE",
+    entityId: site.id,
+    oldValue: existingSite,
+    newValue: site,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return site;
 }

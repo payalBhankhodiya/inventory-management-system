@@ -8,11 +8,10 @@ import type {
   ItemsListQuery,
   UpdateItemInput,
 } from "./item.schema.js";
+import { AuditInfo } from "../../types/audit.js";
+import { createAuditLog } from "../audit-logs/audit-log.service.js";
 
-export async function getItems(
-  organizationId: string,
-  query: ItemsListQuery,
-) {
+export async function getItems(organizationId: string, query: ItemsListQuery) {
   const conditions = [eq(items.organizationId, organizationId)];
 
   if (query.search) {
@@ -73,15 +72,9 @@ export async function getItems(
   };
 }
 
-export async function getItemById(
-  organizationId: string,
-  itemId: string,
-) {
+export async function getItemById(organizationId: string, itemId: string) {
   const item = await db.query.items.findFirst({
-    where: and(
-      eq(items.id, itemId),
-      eq(items.organizationId, organizationId),
-    ),
+    where: and(eq(items.id, itemId), eq(items.organizationId, organizationId)),
   });
 
   if (!item) {
@@ -91,7 +84,7 @@ export async function getItemById(
   return item;
 }
 
-export async function createItem(input: CreateItemInput) {
+export async function createItem(input: CreateItemInput, auditInfo: AuditInfo) {
   const existingCode = await db.query.items.findFirst({
     where: and(
       eq(items.organizationId, input.organizationId),
@@ -146,6 +139,18 @@ export async function createItem(input: CreateItemInput) {
     throw new Error("Failed to create item");
   }
 
+  await createAuditLog({
+    organizationId: item.organizationId,
+    userId: auditInfo.userId,
+    action: "CREATE",
+    entityType: "ITEM",
+    entityId: item.id,
+    oldValue: null,
+    newValue: item,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
   return item;
 }
 
@@ -153,8 +158,15 @@ export async function updateItem(
   organizationId: string,
   itemId: string,
   input: UpdateItemInput,
+  auditInfo: AuditInfo,
 ) {
-  const existingItem = await getItemById(organizationId, itemId);
+  const existingItem = await db.query.items.findFirst({
+    where: and(eq(items.id, itemId), eq(items.organizationId, organizationId)),
+  });
+
+  if (!existingItem) {
+    throw new Error("Item not found");
+  }
 
   if (input.code && input.code !== existingItem.code) {
     const existingCode = await db.query.items.findFirst({
@@ -208,17 +220,24 @@ export async function updateItem(
       status: input.status,
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(items.id, itemId),
-        eq(items.organizationId, organizationId),
-      ),
-    )
+    .where(and(eq(items.id, itemId), eq(items.organizationId, organizationId)))
     .returning();
 
   if (!item) {
     throw new Error("Failed to update item");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "ITEM",
+    entityId: item.id,
+    oldValue: existingItem,
+    newValue: item,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return item;
 }
@@ -226,8 +245,15 @@ export async function updateItem(
 export async function deleteItem(
   organizationId: string,
   itemId: string,
+  auditInfo: AuditInfo,
 ) {
-  const existingItem = await getItemById(organizationId, itemId);
+  const existingItem = await db.query.items.findFirst({
+    where: and(eq(items.id, itemId), eq(items.organizationId, organizationId)),
+  });
+
+  if (!existingItem) {
+    throw new Error("Item not found");
+  }
 
   if (existingItem.status === "INACTIVE") {
     throw new Error("Item is already inactive");
@@ -239,17 +265,24 @@ export async function deleteItem(
       status: "INACTIVE",
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(items.id, itemId),
-        eq(items.organizationId, organizationId),
-      ),
-    )
+    .where(and(eq(items.id, itemId), eq(items.organizationId, organizationId)))
     .returning();
 
   if (!item) {
     throw new Error("Failed to deactivate item");
   }
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "DELETE",
+    entityType: "ITEM",
+    entityId: itemId,
+    oldValue: existingItem,
+    newValue: null,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
 
   return item;
 }

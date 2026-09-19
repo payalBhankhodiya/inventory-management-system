@@ -110,8 +110,11 @@ export const assetRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const asset = await createAsset(request.body);
-
+        const asset = await createAsset(request.body, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.status(201).send({
           success: true,
           message: "Asset created successfully",
@@ -148,8 +151,12 @@ export const assetRoutes = async (app: FastifyInstance) => {
           request.user.organizationId,
           request.params.id,
           request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
         );
-
         return reply.send({
           success: true,
           message: "Asset updated successfully",
@@ -181,8 +188,11 @@ export const assetRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        await deleteAsset(request.user.organizationId, request.params.id);
-
+        await deleteAsset(request.user.organizationId, request.params.id, {
+          userId: request.user.userId,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] ?? null,
+        });
         return reply.send({
           success: true,
           message: "Asset disposed successfully",
