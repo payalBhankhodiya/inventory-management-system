@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   pgEnum,
   pgTable,
@@ -34,6 +35,21 @@ export const users = pgTable(
     passwordHash: varchar("password_hash", {
       length: 255,
     }).notNull(),
+
+    emailVerified: boolean("email_verified")
+      .default(false)
+      .notNull(),
+
+    emailVerificationToken: varchar("email_verification_token", {
+      length: 255,
+    }),
+
+    emailVerificationExpiresAt: timestamp(
+      "email_verification_expires_at",
+      {
+        withTimezone: true,
+      },
+    ),
 
     employeeCode: varchar("employee_code", {
       length: 50,

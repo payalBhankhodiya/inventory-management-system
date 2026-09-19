@@ -1,5 +1,6 @@
 export type AuditInfo = {
-  userId: string;
+  userId: string | null;
   ipAddress?: string;
   userAgent?: string | null;
 };
+
