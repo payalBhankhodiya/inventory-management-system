@@ -49,3 +49,6 @@ pnpm add fastify-type-provider-zod
 
 New-Item -ItemType File -Path .\src\types\fastify.d.ts -Force
 pnpm add fastify-plugin
+
+pnpm add nodemailer
+pnpm add -D @types/nodemailer

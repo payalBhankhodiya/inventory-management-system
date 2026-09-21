@@ -120,54 +120,145 @@ import type {
 } from "./auth.schema.js";
 import { refreshTokens } from "../../db/schema/refresh-token.js";
 import { passwordResetTokens } from "../../db/schema/password-reset-token.js";
+import { sendEmail } from "../../utils/email.js";
 
-export async function registerUser(input: RegisterInput, auditInfo: AuditInfo) {
+type RegisterAuditInfo = {
+  userId: string | null;
+  ipAddress?: string;
+  userAgent?: string | null;
+};
+
+export async function registerUser(
+  input: RegisterInput,
+  auditInfo: RegisterAuditInfo,
+) {
   const existingUser = await db.query.users.findFirst({
     where: eq(users.email, input.email),
   });
 
-  if (existingUser) {
+  if (existingUser?.emailVerified) {
     throw new Error("User with this email already exists");
   }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
 
-  const emailVerificationToken = crypto.randomBytes(32).toString("hex");
+  const emailVerificationToken = crypto
+    .randomBytes(32)
+    .toString("hex");
 
-  const emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const emailVerificationExpiresAt = new Date(
+    Date.now() + 24 * 60 * 60 * 1000,
+  );
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      organizationId: input.organizationId,
-      name: input.name,
-      email: input.email,
-      passwordHash,
+  let user;
 
-      emailVerified: false,
-      emailVerificationToken,
-      emailVerificationExpiresAt,
+  if (existingUser) {
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        name: input.name,
+        passwordHash,
+        organizationId: input.organizationId,
+        employeeCode: input.employeeCode ?? null,
+        roleId: input.roleId,
+        departmentId: input.departmentId ?? null,
+        siteId: input.siteId ?? null,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, existingUser.id))
+      .returning();
 
-      employeeCode: input.employeeCode ?? null,
-      roleId: input.roleId,
-      departmentId: input.departmentId ?? null,
-      siteId: input.siteId ?? null,
+    if (!updatedUser) {
+      throw new Error("Failed to update registration");
+    }
 
-      status: "ACTIVE",
-    })
-    .returning();
+    user = updatedUser;
+  } else {
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        organizationId: input.organizationId,
+        name: input.name,
+        email: input.email,
+        passwordHash,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationExpiresAt,
+        employeeCode: input.employeeCode ?? null,
+        roleId: input.roleId,
+        departmentId: input.departmentId ?? null,
+        siteId: input.siteId ?? null,
+        status: "ACTIVE",
+      })
+      .returning();
 
-  if (!user) {
-    throw new Error("Failed to register user");
+    if (!newUser) {
+      throw new Error("Failed to register user");
+    }
+
+    user = newUser;
   }
+
+  // Send verification email once for both new and unverified users.
+  const verificationLink =
+    `${process.env.APP_URL}/api/auth/verify-email?token=${emailVerificationToken}`;
+
+  await sendEmail(
+    user.email,
+    "Verify your email",
+    `
+      <h2>Verify your email</h2>
+
+      <p>Hello ${user.name},</p>
+
+      <p>
+        ${
+          existingUser
+            ? "Your previous verification request was not completed. Please verify your email again."
+            : "Thank you for registering with Inventory Management System."
+        }
+      </p>
+
+      <p>
+        Please click the button below to verify your email address.
+      </p>
+
+      <p>
+        <a
+          href="${verificationLink}"
+          style="
+            display:inline-block;
+            padding:10px 20px;
+            background:#007bff;
+            color:#ffffff;
+            text-decoration:none;
+            border-radius:5px;
+          "
+        >
+          Verify Email
+        </a>
+      </p>
+
+      <p>
+        This verification link will expire in 24 hours.
+      </p>
+    `,
+  );
 
   await createAuditLog({
     organizationId: user.organizationId,
     userId: auditInfo.userId,
-    action: "REGISTER",
+    action: existingUser ? "REGISTRATION_RETRY" : "REGISTER",
     entityType: "USER",
     entityId: user.id,
-    oldValue: null,
+    oldValue: existingUser
+      ? {
+          emailVerified: existingUser.emailVerified,
+        }
+      : null,
     newValue: {
       id: user.id,
       name: user.name,
@@ -542,9 +633,7 @@ export async function changePassword(
   });
 }
 
-export async function forgotPassword(
-  input: ForgotPasswordInput,
-) {
+export async function forgotPassword(input: ForgotPasswordInput) {
   const user = await db.query.users.findFirst({
     where: eq(users.email, input.email),
   });
@@ -556,14 +645,9 @@ export async function forgotPassword(
 
   const token = crypto.randomBytes(64).toString("hex");
 
-  const tokenHash = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-  const expiresAt = new Date(
-    Date.now() + 30 * 60 * 1000,
-  );
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
   await db.insert(passwordResetTokens).values({
     userId: user.id,
@@ -573,14 +657,10 @@ export async function forgotPassword(
 
   // Temporary development output.
   // Replace with email service later.
-  console.log(
-    `Password reset token for ${user.email}: ${token}`,
-  );
+  console.log(`Password reset token for ${user.email}: ${token}`);
 }
 
-export async function resetPassword(
-  input: ResetPasswordInput,
-) {
+export async function resetPassword(input: ResetPasswordInput) {
   const tokenHash = crypto
     .createHash("sha256")
     .update(input.token)
@@ -609,10 +689,7 @@ export async function resetPassword(
     throw new Error("User not found");
   }
 
-  const passwordHash = await bcrypt.hash(
-    input.newPassword,
-    12,
-  );
+  const passwordHash = await bcrypt.hash(input.newPassword, 12);
 
   await db.transaction(async (tx) => {
     await tx
@@ -637,10 +714,7 @@ export async function resetPassword(
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(refreshTokens.userId, user.id),
-          isNull(refreshTokens.revokedAt),
-        ),
+        and(eq(refreshTokens.userId, user.id), isNull(refreshTokens.revokedAt)),
       );
   });
 

@@ -194,6 +194,9 @@ export const resetPasswordResponseSchema = z.object({
   message: z.string(),
 });
 
-export type ResetPasswordInput = z.infer<
-  typeof resetPasswordSchema
->;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const verifyEmailQuerySchema = z.object({
+  token: z.string().min(1),
+});
+

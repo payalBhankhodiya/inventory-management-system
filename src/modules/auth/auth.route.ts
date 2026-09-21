@@ -134,6 +134,7 @@ import {
   resetPasswordResponseSchema,
   loginSchema,
   loginResponseSchema,
+  verifyEmailQuerySchema,
 } from "./auth.schema.js";
 
 import {
@@ -203,6 +204,37 @@ export const authRoutes = async (app: FastifyInstance) => {
     async (request, reply) => {
       try {
         await verifyEmail(request.body.token);
+
+        return reply.send({
+          success: true,
+          message: "Email verified successfully",
+        });
+      } catch (error) {
+        return reply.status(400).send({
+          success: false,
+          message:
+            error instanceof Error ? error.message : "Failed to verify email",
+        });
+      }
+    },
+  );
+
+  server.get(
+    "/verify-email",
+    {
+      schema: {
+        tags: ["Auth"],
+        security: [],
+        querystring: verifyEmailQuerySchema,
+        response: {
+          200: verifyEmailResponseSchema,
+          400: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        await verifyEmail(request.query.token);
 
         return reply.send({
           success: true,
