@@ -155,6 +155,4 @@ export const resendVerificationSchema = z.object({
   email: z.email("Invalid email address"),
 });
 
-export type ResendVerificationInput = z.infer<
-  typeof resendVerificationSchema
->;
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;

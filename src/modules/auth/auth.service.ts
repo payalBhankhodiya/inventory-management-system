@@ -676,9 +676,7 @@ export async function resetPassword(input: ResetPasswordInput) {
   });
 }
 
-export async function resendVerificationEmail(
-  input: ResendVerificationInput,
-) {
+export async function resendVerificationEmail(input: ResendVerificationInput) {
   const user = await db.query.users.findFirst({
     where: eq(users.email, input.email),
   });
@@ -692,14 +690,10 @@ export async function resendVerificationEmail(
   }
 
   // Generate a new verification token
-  const emailVerificationToken = crypto
-    .randomBytes(32)
-    .toString("hex");
+  const emailVerificationToken = crypto.randomBytes(32).toString("hex");
 
   // Token expires after 24 hours
-  const emailVerificationExpiresAt = new Date(
-    Date.now() + 24 * 60 * 60 * 1000,
-  );
+  const emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const [updatedUser] = await db
     .update(users)
@@ -715,8 +709,7 @@ export async function resendVerificationEmail(
     throw new Error("Failed to resend verification email");
   }
 
-  const verificationLink =
-    `${process.env.APP_URL}/api/auth/verify-email?token=${emailVerificationToken}`;
+  const verificationLink = `${process.env.APP_URL}/api/auth/verify-email?token=${emailVerificationToken}`;
 
   await sendEmail(
     updatedUser.email,
