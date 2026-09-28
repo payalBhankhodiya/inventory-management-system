@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "assignments_one_active_per_asset_idx" ON "assignments" USING btree ("asset_id") WHERE "assignments"."status" = 'ASSIGNED';

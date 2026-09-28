@@ -113,11 +113,15 @@ export const assignmentRoutes = async (app: FastifyInstance) => {
     },
     async (request, reply) => {
       try {
-        const assignment = await createAssignment(request.body, {
-          userId: request.user.userId,
-          ipAddress: request.ip,
-          userAgent: request.headers["user-agent"] ?? null,
-        });
+        const assignment = await createAssignment(
+          request.user.organizationId,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
 
         return reply.status(201).send({
           success: true,

@@ -3,9 +3,12 @@ import {
   pgEnum,
   pgTable,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+
+import { sql } from "drizzle-orm";
 
 import { assetConditionEnum, assets } from "./asset.js";
 import { departments } from "./department.js";
@@ -89,5 +92,8 @@ export const assignments = pgTable(
     index("assignments_department_id_idx").on(table.departmentId),
     index("assignments_site_id_idx").on(table.siteId),
     index("assignments_status_idx").on(table.status),
+    uniqueIndex("assignments_one_active_per_asset_idx")
+      .on(table.assetId)
+      .where(sql`${table.status} = 'ASSIGNED'`),
   ],
 );

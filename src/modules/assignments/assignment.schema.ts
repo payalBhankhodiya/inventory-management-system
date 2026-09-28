@@ -18,19 +18,15 @@ export const createAssignmentSchema = z.object({
 
   assetId: z.uuid(),
   assignedToUserId: z.uuid(),
-  assignedByUserId: z.uuid(),
 
   departmentId: z.uuid().optional(),
   siteId: z.uuid().optional(),
 
-  assignedAt: z.iso.datetime(),
   expectedReturnDate: z.iso.datetime().optional(),
 
   conditionAtAssignment: assetConditionSchema.optional(),
 
   remarks: z.string().max(1000).optional(),
-
-  status: assignmentStatusSchema.default("ASSIGNED"),
 });
 
 export type CreateAssignmentInput = z.infer<

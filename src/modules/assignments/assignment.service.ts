@@ -10,6 +10,8 @@ import type {
 } from "./assignment.schema.js";
 import { AuditInfo } from "../../types/audit.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
+import { assets } from "../../db/schema/asset.js";
+import { users } from "../../db/schema/user.js";
 
 export async function getAssignments(
   organizationId: string,
@@ -94,52 +96,83 @@ export async function getAssignmentById(
 }
 
 export async function createAssignment(
+  organizationId: string,
   input: CreateAssignmentInput,
   auditInfo: AuditInfo,
 ) {
-  const existingAssignment = await db.query.assignments.findFirst({
-    where: and(
-      eq(assignments.organizationId, input.organizationId),
-      eq(assignments.assetId, input.assetId),
-      eq(assignments.status, "ASSIGNED"),
-    ),
+  const assignment = await db.transaction(async (tx) => {
+    const [asset] = await tx
+      .select()
+      .from(assets)
+      .where(
+        and(
+          eq(assets.id, input.assetId),
+          eq(assets.organizationId, organizationId),
+        ),
+      )
+      .for("update");
+
+    if (!asset) {
+      throw new Error("Asset not found");
+    }
+
+    if (asset.status !== "AVAILABLE") {
+      throw new Error("Asset is not available for assignment");
+    }
+
+    const [user] = await tx
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.id, input.assignedToUserId),
+          eq(users.organizationId, organizationId),
+        ),
+      );
+
+    if (!user) {
+      throw new Error("Assigned user not found in this organization");
+    }
+
+    const now = new Date();
+
+    const [created] = await tx
+      .insert(assignments)
+      .values({
+        organizationId,
+        assetId: asset.id,
+        assignedToUserId: user.id,
+        assignedByUserId: auditInfo.userId,
+        departmentId: input.departmentId ?? null,
+        siteId: input.siteId ?? null,
+        assignedAt: now,
+        expectedReturnDate: input.expectedReturnDate
+          ? new Date(input.expectedReturnDate)
+          : null,
+        conditionAtAssignment:
+          input.conditionAtAssignment ?? asset.condition,
+        remarks: input.remarks ?? null,
+        status: "ASSIGNED",
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error("Failed to create assignment");
+    }
+
+    await tx
+      .update(assets)
+      .set({
+        status: "ASSIGNED",
+        updatedAt: now,
+      })
+      .where(eq(assets.id, asset.id));
+
+    return created;
   });
 
-  if (existingAssignment) {
-    throw new Error("Asset is already assigned");
-  }
-
-  const [assignment] = await db
-    .insert(assignments)
-    .values({
-      organizationId: input.organizationId,
-
-      assetId: input.assetId,
-      assignedToUserId: input.assignedToUserId,
-      assignedByUserId: input.assignedByUserId,
-
-      departmentId: input.departmentId,
-      siteId: input.siteId,
-
-      assignedAt: new Date(input.assignedAt),
-      expectedReturnDate: input.expectedReturnDate
-        ? new Date(input.expectedReturnDate)
-        : undefined,
-
-      conditionAtAssignment: input.conditionAtAssignment,
-
-      remarks: input.remarks,
-
-      status: input.status,
-    })
-    .returning();
-
-  if (!assignment) {
-    throw new Error("Failed to create assignment");
-  }
-
   await createAuditLog({
-    organizationId: assignment.organizationId,
+    organizationId,
     userId: auditInfo.userId,
     action: "CREATE",
     entityType: "ASSIGNMENT",
