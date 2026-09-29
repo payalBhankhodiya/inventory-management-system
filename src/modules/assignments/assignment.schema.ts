@@ -6,12 +6,7 @@ export const assignmentStatusSchema = z.enum([
   "CANCELLED",
 ]);
 
-export const assetConditionSchema = z.enum([
-  "NEW",
-  "GOOD",
-  "FAIR",
-  "DAMAGED",
-]);
+export const assetConditionSchema = z.enum(["NEW", "GOOD", "FAIR", "DAMAGED"]);
 
 export const createAssignmentSchema = z.object({
   organizationId: z.uuid(),
@@ -29,30 +24,17 @@ export const createAssignmentSchema = z.object({
   remarks: z.string().max(1000).optional(),
 });
 
-export type CreateAssignmentInput = z.infer<
-  typeof createAssignmentSchema
->;
+export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
 
 export const updateAssignmentSchema = z.object({
-  assignedToUserId: z.uuid().optional(),
   departmentId: z.uuid().nullable().optional(),
   siteId: z.uuid().nullable().optional(),
-
   expectedReturnDate: z.iso.datetime().nullable().optional(),
-
-  returnedAt: z.iso.datetime().nullable().optional(),
-
   conditionAtAssignment: assetConditionSchema.nullable().optional(),
-  conditionAtReturn: assetConditionSchema.nullable().optional(),
-
   remarks: z.string().max(1000).nullable().optional(),
-
-  status: assignmentStatusSchema.optional(),
 });
 
-export type UpdateAssignmentInput = z.infer<
-  typeof updateAssignmentSchema
->;
+export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;
 
 export const assignmentIdParamSchema = z.object({
   id: z.uuid(),
@@ -72,9 +54,7 @@ export const assignmentsListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
-export type AssignmentsListQuery = z.infer<
-  typeof assignmentsListQuerySchema
->;
+export type AssignmentsListQuery = z.infer<typeof assignmentsListQuerySchema>;
 
 export const assignmentResponseSchema = z.object({
   id: z.uuid(),
@@ -129,3 +109,10 @@ export const assignmentErrorResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
 });
+
+export const returnAssignmentSchema = z.object({
+  conditionAtReturn: assetConditionSchema,
+  remarks: z.string().max(1000).optional(),
+});
+
+export type ReturnAssignmentInput = z.infer<typeof returnAssignmentSchema>;

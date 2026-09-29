@@ -6,12 +6,15 @@ import { assignments } from "../../db/schema/assignment.js";
 import type {
   AssignmentsListQuery,
   CreateAssignmentInput,
+  ReturnAssignmentInput,
   UpdateAssignmentInput,
 } from "./assignment.schema.js";
 import { AuditInfo } from "../../types/audit.js";
 import { createAuditLog } from "../audit-logs/audit-log.service.js";
 import { assets } from "../../db/schema/asset.js";
 import { users } from "../../db/schema/user.js";
+import { sites } from "../../db/schema/site.js";
+import { departments } from "../../db/schema/department.js";
 
 export async function getAssignments(
   organizationId: string,
@@ -134,6 +137,47 @@ export async function createAssignment(
       throw new Error("Assigned user not found in this organization");
     }
 
+    let assignmentSiteId = input.siteId ?? null;
+
+    if (input.departmentId) {
+      const [department] = await tx
+        .select()
+        .from(departments)
+        .where(
+          and(
+            eq(departments.id, input.departmentId),
+            eq(departments.organizationId, organizationId),
+            eq(departments.status, "ACTIVE"),
+          ),
+        );
+
+      if (!department) {
+        throw new Error("Active department not found in this organization");
+      }
+
+      if (assignmentSiteId && department.siteId !== assignmentSiteId) {
+        throw new Error("Department does not belong to the selected site");
+      }
+
+      assignmentSiteId = department.siteId;
+    }
+
+    if (assignmentSiteId) {
+      const [site] = await tx
+        .select()
+        .from(sites)
+        .where(
+          and(
+            eq(sites.id, assignmentSiteId),
+            eq(sites.organizationId, organizationId),
+            eq(sites.status, "ACTIVE"),
+          ),
+        );
+
+      if (!site) {
+        throw new Error("Active site not found in this organization");
+      }
+    }
     const now = new Date();
 
     const [created] = await tx
@@ -144,13 +188,12 @@ export async function createAssignment(
         assignedToUserId: user.id,
         assignedByUserId: auditInfo.userId,
         departmentId: input.departmentId ?? null,
-        siteId: input.siteId ?? null,
+        siteId: assignmentSiteId,
         assignedAt: now,
         expectedReturnDate: input.expectedReturnDate
           ? new Date(input.expectedReturnDate)
           : null,
-        conditionAtAssignment:
-          input.conditionAtAssignment ?? asset.condition,
+        conditionAtAssignment: input.conditionAtAssignment ?? asset.condition,
         remarks: input.remarks ?? null,
         status: "ASSIGNED",
       })
@@ -206,10 +249,7 @@ export async function updateAssignment(
   const [assignment] = await db
     .update(assignments)
     .set({
-      assignedToUserId: input.assignedToUserId,
-
       departmentId: input.departmentId,
-
       siteId: input.siteId,
 
       expectedReturnDate:
@@ -219,20 +259,8 @@ export async function updateAssignment(
             : new Date(input.expectedReturnDate)
           : undefined,
 
-      returnedAt:
-        input.returnedAt !== undefined
-          ? input.returnedAt === null
-            ? null
-            : new Date(input.returnedAt)
-          : undefined,
-
       conditionAtAssignment: input.conditionAtAssignment,
-
-      conditionAtReturn: input.conditionAtReturn,
-
       remarks: input.remarks,
-
-      status: input.status,
 
       updatedAt: new Date(),
     })
@@ -268,50 +296,164 @@ export async function deleteAssignment(
   assignmentId: string,
   auditInfo: AuditInfo,
 ) {
-  const existingAssignment = await db.query.assignments.findFirst({
-    where: and(
-      eq(assignments.id, assignmentId),
-      eq(assignments.organizationId, organizationId),
-    ),
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(assignments)
+      .where(
+        and(
+          eq(assignments.id, assignmentId),
+          eq(assignments.organizationId, organizationId),
+        ),
+      )
+      .for("update");
+
+    if (!existing) {
+      throw new Error("Assignment not found");
+    }
+
+    if (existing.status !== "ASSIGNED") {
+      throw new Error("Only active assignments can be cancelled");
+    }
+
+    const now = new Date();
+
+    const [cancelled] = await tx
+      .update(assignments)
+      .set({
+        status: "CANCELLED",
+        updatedAt: now,
+      })
+      .where(eq(assignments.id, assignmentId))
+      .returning();
+
+    if (!cancelled) {
+      throw new Error("Failed to cancel assignment");
+    }
+
+    await tx
+      .update(assets)
+      .set({
+        status: "AVAILABLE",
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(assets.id, existing.assetId),
+          eq(assets.organizationId, organizationId),
+          eq(assets.status, "ASSIGNED"),
+        ),
+      );
+
+    return {
+      oldValue: existing,
+      assignment: cancelled,
+    };
   });
-
-  if (!existingAssignment) {
-    throw new Error("Assignment not found");
-  }
-
-  if (existingAssignment.status === "CANCELLED") {
-    throw new Error("Assignment is already cancelled");
-  }
-
-  const [assignment] = await db
-    .update(assignments)
-    .set({
-      status: "CANCELLED",
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(assignments.id, assignmentId),
-        eq(assignments.organizationId, organizationId),
-      ),
-    )
-    .returning();
-
-  if (!assignment) {
-    throw new Error("Failed to cancel assignment");
-  }
 
   await createAuditLog({
     organizationId,
     userId: auditInfo.userId,
     action: "DELETE",
     entityType: "ASSIGNMENT",
-    entityId: assignmentId,
-    oldValue: existingAssignment,
-    newValue: null,
+    entityId: result.assignment.id,
+    oldValue: result.oldValue,
+    newValue: result.assignment,
     ipAddress: auditInfo.ipAddress ?? null,
     userAgent: auditInfo.userAgent ?? null,
   });
 
-  return assignment;
+  return result.assignment;
+}
+
+export async function returnAssignment(
+  organizationId: string,
+  assignmentId: string,
+  input: ReturnAssignmentInput,
+  auditInfo: AuditInfo,
+) {
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(assignments)
+      .where(
+        and(
+          eq(assignments.id, assignmentId),
+          eq(assignments.organizationId, organizationId),
+        ),
+      )
+      .for("update");
+
+    if (!existing) {
+      throw new Error("Assignment not found");
+    }
+
+    if (existing.status !== "ASSIGNED") {
+      throw new Error("Only active assignments can be returned");
+    }
+
+    const [asset] = await tx
+      .select()
+      .from(assets)
+      .where(
+        and(
+          eq(assets.id, existing.assetId),
+          eq(assets.organizationId, organizationId),
+        ),
+      )
+      .for("update");
+
+    if (!asset) {
+      throw new Error("Asset not found");
+    }
+
+    const now = new Date();
+
+    const [updated] = await tx
+      .update(assignments)
+      .set({
+        status: "RETURNED",
+        returnedAt: now,
+        conditionAtReturn: input.conditionAtReturn,
+        remarks: input.remarks ?? existing.remarks,
+        updatedAt: now,
+      })
+      .where(eq(assignments.id, assignmentId))
+      .returning();
+
+    if (!updated) {
+      throw new Error("Failed to return assignment");
+    }
+
+    const assetStatus =
+      input.conditionAtReturn === "DAMAGED" ? "DAMAGED" : "AVAILABLE";
+
+    await tx
+      .update(assets)
+      .set({
+        condition: input.conditionAtReturn,
+        status: assetStatus,
+        updatedAt: now,
+      })
+      .where(eq(assets.id, asset.id));
+
+    return {
+      oldValue: existing,
+      assignment: updated,
+    };
+  });
+
+  await createAuditLog({
+    organizationId,
+    userId: auditInfo.userId,
+    action: "UPDATE",
+    entityType: "ASSIGNMENT",
+    entityId: result.assignment.id,
+    oldValue: result.oldValue,
+    newValue: result.assignment,
+    ipAddress: auditInfo.ipAddress ?? null,
+    userAgent: auditInfo.userAgent ?? null,
+  });
+
+  return result.assignment;
 }

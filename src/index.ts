@@ -8,9 +8,6 @@ const start = async () => {
 
     await app.ready();
 
-    console.log("\nRegistered Routes:");
-    console.log(app.printRoutes());
-
     await app.listen({
       port: Number(process.env.PORT) || 5000,
       host: process.env.HOST || "0.0.0.0",

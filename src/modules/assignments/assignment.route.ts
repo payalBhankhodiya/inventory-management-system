@@ -11,6 +11,7 @@ import {
   assignmentsListResponseSchema,
   createAssignmentSchema,
   deleteAssignmentResponseSchema,
+  returnAssignmentSchema,
   updateAssignmentSchema,
 } from "./assignment.schema.js";
 
@@ -19,6 +20,7 @@ import {
   deleteAssignment,
   getAssignmentById,
   getAssignments,
+  returnAssignment,
   updateAssignment,
 } from "./assignment.service.js";
 
@@ -217,6 +219,55 @@ export const assignmentRoutes = async (app: FastifyInstance) => {
               ? error.message
               : "Failed to cancel assignment",
         });
+      }
+    },
+  );
+
+  server.patch(
+    "/:id/return",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Assignments"],
+        params: assignmentIdParamSchema,
+        body: returnAssignmentSchema,
+        response: {
+          200: assignmentSingleResponseSchema,
+          400: assignmentErrorResponseSchema,
+          404: assignmentErrorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const assignment = await returnAssignment(
+          request.user.organizationId,
+          request.params.id,
+          request.body,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
+
+        return reply.send({
+          success: true,
+          message: "Assignment returned successfully",
+          data: assignment,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to return assignment";
+
+        return reply
+          .status(message === "Assignment not found" ? 404 : 400)
+          .send({
+            success: false,
+            message,
+          });
       }
     },
   );
