@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  uniqueIndex,
   pgEnum,
   pgTable,
   timestamp,
@@ -36,20 +37,15 @@ export const users = pgTable(
       length: 255,
     }).notNull(),
 
-    emailVerified: boolean("email_verified")
-      .default(false)
-      .notNull(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
 
     emailVerificationToken: varchar("email_verification_token", {
       length: 255,
     }),
 
-    emailVerificationExpiresAt: timestamp(
-      "email_verification_expires_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    emailVerificationExpiresAt: timestamp("email_verification_expires_at", {
+      withTimezone: true,
+    }),
 
     employeeCode: varchar("employee_code", {
       length: 50,
@@ -87,5 +83,10 @@ export const users = pgTable(
     index("users_role_id_idx").on(table.roleId),
     index("users_department_id_idx").on(table.departmentId),
     index("users_site_id_idx").on(table.siteId),
+
+    uniqueIndex("users_org_employee_code_unique").on(
+      table.organizationId,
+      table.employeeCode,
+    ),
   ],
 );

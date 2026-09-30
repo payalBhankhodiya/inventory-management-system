@@ -50,6 +50,13 @@
       "when": 1790426667746,
       "tag": "0006_add_assignment_active_unique_index",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790759714295,
+      "tag": "0007_unique_employee_code_per_org",
+      "breakpoints": true
     }
   ]
 }
