@@ -15,12 +15,15 @@ import {
 } from "./transfer.schema.js";
 
 import {
+  approveTransfer,
   createTransfer,
   deleteTransfer,
   getTransferById,
   getTransfers,
+  requestTransfer,
   updateTransfer,
 } from "./transfer.service.js";
+import { errorResponseSchema } from "../auth/auth.schema.js";
 
 export const transferRoutes = async (app: FastifyInstance) => {
   const server = app.withTypeProvider<ZodTypeProvider>();
@@ -164,18 +167,25 @@ export const transferRoutes = async (app: FastifyInstance) => {
           },
         );
 
-        return reply.send({
+        return reply.status(200).send({
           success: true,
           message: "Transfer updated successfully",
           data: transfer,
         });
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to update transfer";
+
+        if (message === "Transfer not found") {
+          return reply.status(404).send({
+            success: false,
+            message,
+          });
+        }
+
         return reply.status(400).send({
           success: false,
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to update transfer",
+          message,
         });
       }
     },
@@ -213,6 +223,101 @@ export const transferRoutes = async (app: FastifyInstance) => {
             error instanceof Error
               ? error.message
               : "Failed to cancel transfer",
+        });
+      }
+    },
+  );
+
+  server.patch(
+    "/:id/request",
+    {
+      preHandler: [authenticate],
+      schema: {
+        tags: ["Transfers"],
+        params: transferIdParamSchema,
+        response: {
+          200: transferSingleResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const transfer = await requestTransfer(
+          request.user.organizationId,
+          request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
+
+        return reply.code(200).send({
+          success: true,
+          message: "Transfer requested successfully",
+          data: transfer,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to request transfer";
+
+        const statusCode = message === "Transfer not found" ? 404 : 400;
+
+        return reply.code(statusCode).send({
+          success: false,
+          message,
+        });
+      }
+    },
+  );
+
+  server.patch(
+    "/:id/approve",
+    {
+      preHandler: authenticate,
+      schema: {
+        tags: ["Transfers"],
+        params: transferIdParamSchema,
+        response: {
+          200: transferSingleResponseSchema,
+          400: transferErrorResponseSchema,
+          404: transferErrorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const transfer = await approveTransfer(
+          request.user.organizationId,
+          request.params.id,
+          {
+            userId: request.user.userId,
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] ?? null,
+          },
+        );
+
+        return reply.status(200).send({
+          success: true,
+          message: "Transfer approved successfully",
+          data: transfer,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to approve transfer";
+
+        if (message === "Transfer not found") {
+          return reply.status(404).send({
+            success: false,
+            message,
+          });
+        }
+
+        return reply.status(400).send({
+          success: false,
+          message,
         });
       }
     },

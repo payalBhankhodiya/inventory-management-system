@@ -13,35 +13,40 @@ export const transferStatusSchema = z.enum([
 export const transferItemInputSchema = z.object({
   itemId: z.uuid(),
   assetId: z.uuid().nullable().optional(),
-  quantity: z.string().min(1),
+  quantity: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Quantity must be a valid decimal")
+    .refine((value) => Number(value) > 0, "Quantity must be greater than 0"),
   remarks: z.string().max(1000).optional(),
 });
 
 export type TransferItemInput = z.infer<typeof transferItemInputSchema>;
 
-export const createTransferSchema = z.object({
-  organizationId: z.uuid(),
+export const createTransferSchema = z
+  .object({
+    organizationId: z.uuid(),
+    referenceNo: z.string().min(1).max(100),
 
-  referenceNo: z.string().min(1).max(100),
+    fromStorageAreaId: z.uuid(),
+    fromStorageUnitId: z.uuid(),
+    toStorageAreaId: z.uuid(),
+    toStorageUnitId: z.uuid(),
 
-  fromStorageAreaId: z.uuid(),
-  fromStorageUnitId: z.uuid(),
+    transferDate: z.iso.datetime().optional(),
+    reason: z.string().max(500).optional(),
+    remarks: z.string().max(1000).optional(),
 
-  toStorageAreaId: z.uuid(),
-  toStorageUnitId: z.uuid(),
-
-  requestedBy: z.uuid(),
-  approvedBy: z.uuid().nullable().optional(),
-
-  transferDate: z.iso.datetime().optional(),
-
-  status: transferStatusSchema.default("DRAFT"),
-
-  reason: z.string().max(500).optional(),
-  remarks: z.string().max(1000).optional(),
-
-  items: z.array(transferItemInputSchema).min(1),
-});
+    items: z.array(transferItemInputSchema).min(1),
+  })
+  .refine(
+    (data) =>
+      data.fromStorageAreaId !== data.toStorageAreaId ||
+      data.fromStorageUnitId !== data.toStorageUnitId,
+    {
+      message: "Source and destination must be different",
+      path: ["toStorageUnitId"],
+    },
+  );
 
 export type CreateTransferInput = z.infer<typeof createTransferSchema>;
 
@@ -52,12 +57,7 @@ export const updateTransferSchema = z.object({
   toStorageAreaId: z.uuid().optional(),
   toStorageUnitId: z.uuid().optional(),
 
-  approvedBy: z.uuid().nullable().optional(),
-
   transferDate: z.iso.datetime().nullable().optional(),
-
-  status: transferStatusSchema.optional(),
-
   reason: z.string().max(500).nullable().optional(),
   remarks: z.string().max(1000).nullable().optional(),
 });
